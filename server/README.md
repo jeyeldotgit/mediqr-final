@@ -40,10 +40,21 @@ npm install
 2. Configure environment variables (create a `.env` file in `server/`):
 
 ```bash
-SUPABASE_DB_URL=postgres://user:password@host:5432/dbname
+# Supabase Configuration
+# Get these from your Supabase dashboard: Settings → API
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+
+# Server Configuration
 PORT=4000
 NODE_ENV=development
 ```
+
+**Important:**
+
+- The `SUPABASE_SERVICE_ROLE_KEY` is different from the anon/public key
+- Find it in your Supabase dashboard under Settings → API → `service_role` key
+- Keep this key secret - it bypasses Row-Level Security (RLS) policies
 
 3. Run the development server:
 
@@ -53,5 +64,3 @@ npm run dev
 
 The API will be available at `http://localhost:4000/api`, with a basic
 health check at `GET /api/health`.
-
-

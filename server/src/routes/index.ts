@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { initAuth } from "../controllers/authController";
 
 const router = Router();
 
@@ -6,5 +7,8 @@ const router = Router();
 router.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "mediqr-server" });
 });
+
+// Auth endpoints
+router.post("/auth/init", initAuth);
 
 export default router;
