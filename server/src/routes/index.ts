@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { initAuth } from "../controllers/authController";
 import { syncVault, getVaultItems } from "../controllers/vaultController";
+import { rotateQRToken } from "../controllers/qrController";
+import { staffAuth } from "../controllers/staffController";
+import { recordAccess } from "../controllers/recordController";
 
 const router = Router();
 
@@ -15,5 +18,14 @@ router.post("/auth/init", initAuth);
 // Vault endpoints
 router.post("/vault/sync", syncVault);
 router.get("/vault/:ownerId", getVaultItems);
+
+// QR token endpoints
+router.post("/qr/rotate", rotateQRToken);
+
+// Staff endpoints
+router.post("/staff/auth", staffAuth);
+
+// Record access endpoints (requires staff authentication)
+router.post("/record/access", recordAccess);
 
 export default router;
