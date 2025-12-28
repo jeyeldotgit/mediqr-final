@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCrypto } from "../contexts/CryptoProvider";
 import {
   syncVault,
@@ -6,7 +7,7 @@ import {
   type VaultCategory,
   type VaultItem,
 } from "../services/vaultService";
-import { getUserId } from "../lib/storage";
+import { getUserId, isOnboarded } from "../lib/storage";
 import {
   User,
   AlertTriangle,
@@ -63,6 +64,22 @@ export default function Vault() {
     medications: {},
     records: {},
   });
+
+  const navigate = useNavigate();
+
+  // Redirect if locked
+  useEffect(() => {
+    if (!isUnlocked) {
+      // If user is onboarded but locked, redirect to restore
+      // Otherwise, redirect to onboarding
+      if (isOnboarded()) {
+        navigate("/restore");
+      } else {
+        navigate("/onboarding");
+      }
+      return;
+    }
+  }, [isUnlocked, navigate]);
 
   // Load vault items on mount
   useEffect(() => {

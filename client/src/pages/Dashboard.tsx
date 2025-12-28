@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useCrypto } from "../contexts/CryptoProvider";
 import { useNavigate } from "react-router-dom";
 import { getVaultItems, type VaultItem } from "../services/vaultService";
-import { getUserId } from "../lib/storage";
+import { getUserId, isOnboarded } from "../lib/storage";
+import QRGenerator from "../components/QRGenerator";
 import {
   Heart,
   QrCode,
@@ -24,7 +25,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!isUnlocked) {
-      navigate("/onboarding");
+      // If user is onboarded but locked, redirect to restore
+      // Otherwise, redirect to onboarding
+      if (isOnboarded()) {
+        navigate("/restore");
+      } else {
+        navigate("/onboarding");
+      }
       return;
     }
 
@@ -215,8 +222,11 @@ export default function Dashboard() {
                 <button
                   className="btn btn-secondary w-full"
                   onClick={() => {
-                    // Placeholder for QR generation
-                    alert("QR code generation coming soon!");
+                    // Scroll to QR generator section
+                    const qrSection = document.getElementById("qr-generator-section");
+                    if (qrSection) {
+                      qrSection.scrollIntoView({ behavior: "smooth" });
+                    }
                   }}
                 >
                   Generate QR
@@ -252,6 +262,11 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* QR Generator Section */}
+        <div id="qr-generator-section" className="mt-6">
+          <QRGenerator />
         </div>
 
         {/* Security Notice */}

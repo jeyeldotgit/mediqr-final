@@ -95,18 +95,30 @@ client/
 User visits app → Landing page → Check onboarding status
 ```
 
-### 2. Onboarding Flow
+### 2. Onboarding Flow (New Users)
 
 ```
 Generate mnemonic → Display words → Verify words →
 Derive MEK → Unlock CryptoProvider → Create profile → Dashboard
 ```
 
-### 3. Authenticated Flow
+### 3. Restore Flow (Existing Users)
 
 ```
-Dashboard → Check if unlocked →
-If locked: Restore from mnemonic → Unlock → Access vault
+User enters 12-word mnemonic → Validate format →
+Derive MEK → Unlock CryptoProvider → Dashboard
+```
+
+### 4. Authenticated Flow
+
+```
+App loads → Check onboarding status:
+  - Not onboarded → /onboarding
+  - Onboarded but locked → /restore
+  - Onboarded and unlocked → /dashboard
+
+Dashboard/Vault → Check if unlocked →
+If locked: Redirect to /restore → User enters mnemonic → Unlock → Access vault
 ```
 
 ---
@@ -236,13 +248,34 @@ Minimal state persisted locally:
 ### Routes
 
 - `/` - Landing page
-- `/onboarding` - Onboarding flow
+- `/onboarding` - Onboarding flow (new users)
+- `/restore` - Restore/login page (existing users)
 - `/dashboard` - User dashboard
 - `/vault` - Vault management page
+- `/staff/login` - Staff authentication
+- `/staff/scanner` - QR scanner for staff
+- `/staff/patient-view/:id` - Patient record view
 
-### Route Protection
+### Route Protection & Authentication Flow
 
-Currently basic - checks `isOnboarded()` flag. Future phases will implement proper authentication.
+**Citizen Routes:**
+
+- **New Users**: Not onboarded → `/onboarding` (generate mnemonic)
+- **Existing Users (Locked)**: Onboarded but vault locked → `/restore` (enter mnemonic)
+- **Existing Users (Unlocked)**: Onboarded and unlocked → `/dashboard` or `/vault`
+
+**Authentication Model:**
+
+- Follows "Login = Restore" model from architecture
+- Master key never persisted - only in memory
+- Users must re-enter mnemonic after page refresh
+- All decryption happens client-side
+
+**Staff Routes:**
+
+- Staff token stored in localStorage
+- Protected routes check for staff token
+- Token expires after 8 hours
 
 ---
 

@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useCrypto } from "../contexts/CryptoProvider";
 import { isOnboarded } from "../lib/storage";
 import {
   Shield,
@@ -17,11 +18,17 @@ import {
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { isUnlocked } = useCrypto();
   const onboarded = isOnboarded();
 
   const handleGetStarted = () => {
     if (onboarded) {
-      navigate("/dashboard");
+      // If unlocked, go to dashboard; otherwise, go to restore
+      if (isUnlocked) {
+        navigate("/dashboard");
+      } else {
+        navigate("/restore");
+      }
     } else {
       navigate("/onboarding");
     }
@@ -390,7 +397,7 @@ export default function Landing() {
               <span className="text-lg font-bold">MediQR</span>
             </div>
             <p className="text-sm opacity-80 text-center">
-              © 2024 MediQR. Your health data, your control.
+              © 2026 MediQR. Your health data, your control.
             </p>
           </div>
         </div>
