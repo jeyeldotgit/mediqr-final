@@ -5,7 +5,7 @@ import {
   validateMnemonicPhrase,
 } from "../lib/crypto/mnemonic";
 import { useCrypto } from "../contexts/CryptoProvider";
-import { setOnboarded, storeMnemonic, storeLocalShard } from "../lib/storage";
+import { setOnboarded, storeMnemonic, storeLocalShard, storeUserId } from "../lib/storage";
 import { initProfile } from "../lib/api";
 import { derivePublicKey, hashIdentifier } from "../lib/crypto/identifier";
 
@@ -86,7 +86,11 @@ export default function Onboarding() {
       const hashedId = await hashIdentifier(phrase);
 
       try {
-        await initProfile(publicKey, hashedId);
+        const profileResult = await initProfile(publicKey, hashedId);
+        // Store user ID for future API calls
+        if (profileResult.userId) {
+          storeUserId(profileResult.userId);
+        }
       } catch (apiError) {
         console.error("Failed to initialize profile:", apiError);
         // Continue anyway - profile creation can be retried later

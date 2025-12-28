@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   ONBOARDED: "mediqr_onboarded",
   MNEMONIC: "mediqr_mnemonic", // Only for Phase 1 - should be removed in production
   LOCAL_SHARD: "mediqr_local_shard",
+  USER_ID: "mediqr_user_id", // Store user ID after profile creation
 } as const;
 
 /**
@@ -56,6 +57,20 @@ export function storeLocalShard(shard: string): void {
  */
 export function getLocalShard(): string | null {
   return localStorage.getItem(STORAGE_KEYS.LOCAL_SHARD);
+}
+
+/**
+ * Store user ID after profile creation
+ */
+export function storeUserId(userId: string): void {
+  localStorage.setItem(STORAGE_KEYS.USER_ID, userId);
+}
+
+/**
+ * Retrieve user ID
+ */
+export function getUserId(): string | null {
+  return localStorage.getItem(STORAGE_KEYS.USER_ID);
 }
 
 /**
