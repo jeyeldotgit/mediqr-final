@@ -6,7 +6,7 @@ import {
 } from "../lib/crypto/mnemonic";
 import { useCrypto } from "../contexts/CryptoProvider";
 import { setOnboarded, storeMnemonic, storeLocalShard, storeUserId } from "../lib/storage";
-import { initProfile } from "../lib/api";
+import { initProfile } from "../services/authService";
 import { derivePublicKey, hashIdentifier } from "../lib/crypto/identifier";
 
 type Step = "generate" | "verify" | "complete";

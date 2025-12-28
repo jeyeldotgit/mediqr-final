@@ -13,6 +13,7 @@ The MediQR client is a React + TypeScript Progressive Web Application (PWA) that
 All encryption and key management happens in the browser:
 
 - ✅ **Client handles:**
+
   - BIP-39 mnemonic generation
   - Master Encryption Key (MEK) derivation
   - AES-256-GCM encryption/decryption
@@ -62,10 +63,15 @@ client/
 │   ├── pages/
 │   │   ├── Landing.tsx       # Landing page
 │   │   ├── Onboarding.tsx    # Onboarding flow
-│   │   └── Dashboard.tsx    # User dashboard
+│   │   ├── Dashboard.tsx     # User dashboard
+│   │   └── Vault.tsx         # Vault management page
+│   ├── services/
+│   │   ├── apiClient.ts      # Base API client with shared config
+│   │   ├── authService.ts     # Authentication & profile services
+│   │   ├── vaultService.ts    # Vault operations
+│   │   └── README.md         # Services documentation
 │   ├── lib/
-│   │   ├── api.ts           # API client
-│   │   ├── storage.ts       # Local storage utilities
+│   │   ├── storage.ts        # Local storage utilities
 │   │   └── crypto/
 │   │       ├── mnemonic.ts   # BIP-39 mnemonic utilities
 │   │       ├── keyDerivation.ts # MEK derivation
@@ -84,19 +90,22 @@ client/
 ## Application Flow
 
 ### 1. Initial Load
+
 ```
 User visits app → Landing page → Check onboarding status
 ```
 
 ### 2. Onboarding Flow
+
 ```
-Generate mnemonic → Display words → Verify words → 
+Generate mnemonic → Display words → Verify words →
 Derive MEK → Unlock CryptoProvider → Create profile → Dashboard
 ```
 
 ### 3. Authenticated Flow
+
 ```
-Dashboard → Check if unlocked → 
+Dashboard → Check if unlocked →
 If locked: Restore from mnemonic → Unlock → Access vault
 ```
 
@@ -109,26 +118,29 @@ If locked: Restore from mnemonic → Unlock → Access vault
 React Context that manages encryption state and provides crypto operations.
 
 **State:**
+
 - `masterKey: CryptoKey | null` - The master encryption key
 - `isUnlocked: boolean` - Whether the crypto is unlocked
 
 **Methods:**
+
 - `unlock(mnemonic: string)` - Derive MEK and unlock
 - `lock()` - Clear master key from memory
 - `encryptData(plaintext: string)` - Encrypt data
 - `decryptData(encrypted: string, iv: string)` - Decrypt data
 
 **Usage:**
+
 ```typescript
 import { useCrypto } from "../contexts/CryptoProvider";
 
 function MyComponent() {
   const { isUnlocked, encryptData, decryptData } = useCrypto();
-  
+
   if (!isUnlocked) {
     return <div>Please unlock first</div>;
   }
-  
+
   // Use encryption functions
 }
 ```
@@ -144,6 +156,7 @@ Multi-step wizard for new users:
 ### Landing Page
 
 Marketing/landing page with:
+
 - Hero section
 - Features showcase
 - How it works
@@ -225,6 +238,7 @@ Minimal state persisted locally:
 - `/` - Landing page
 - `/onboarding` - Onboarding flow
 - `/dashboard` - User dashboard
+- `/vault` - Vault management page
 
 ### Route Protection
 
@@ -334,6 +348,7 @@ VITE_API_URL=https://api.mediqr.com/api
 ## Future Enhancements
 
 ### Phase 2+
+
 - [ ] Vault UI for managing medical records
 - [ ] QR code generation component
 - [ ] Social recovery guardian management
@@ -405,10 +420,56 @@ VITE_API_URL=https://api.mediqr.com/api
 
 ---
 
+## Services Architecture
+
+API communication is organized into service modules located in `src/services/`:
+
+### Service Modules
+
+- **`apiClient.ts`** - Base API client with shared configuration
+
+  - `apiRequest()` - Generic fetch wrapper with error handling
+  - `API_BASE_URL` - Centralized API endpoint configuration
+
+- **`authService.ts`** - Authentication and profile management
+
+  - `initProfile()` - Initialize user profile after onboarding
+
+- **`vaultService.ts`** - Vault operations
+  - `syncVault()` - Sync encrypted blob to server
+  - `getVaultItems()` - Retrieve vault metadata
+
+### Service Pattern
+
+All services follow a consistent pattern:
+
+```typescript
+import { apiRequest } from "./apiClient";
+
+export interface MyRequest {
+  /* ... */
+}
+export interface MyResponse {
+  /* ... */
+}
+
+export async function myServiceFunction(data: MyRequest): Promise<MyResponse> {
+  return apiRequest<MyResponse>("/endpoint", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+```
+
+See [Services README](../src/services/README.md) for more details.
+
+---
+
 ## See Also
 
 - [Client API Documentation](./api.md)
+- [Services README](../src/services/README.md)
 - [Server Architecture](../../server/docs/architecture.md)
 - [Final Plan](../../docs/FinalPlan.md)
 - [Phase 1 Implementation](../../docs/Phase1-Implementation.md)
-
+- [Phase 2 Implementation](../../docs/Phase2-Implementation.md)

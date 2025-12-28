@@ -193,9 +193,30 @@ fetch(url, { signal: controller.signal })
 
 ---
 
+---
+
+## Service Structure
+
+Services are organized by domain for better maintainability:
+
+```
+src/services/
+├── apiClient.ts      # Base API client
+├── authService.ts    # Authentication
+├── vaultService.ts   # Vault operations
+└── README.md         # Service documentation
+```
+
+### Adding New Services
+
+See `src/services/README.md` for guidelines on creating new services.
+
+---
+
 ## See Also
 
 - [Server API Documentation](../../server/docs/api.md)
 - [Client Architecture](./architecture.md)
+- [Services README](../src/services/README.md)
 - [Crypto Utilities](../src/lib/crypto/README.md)
 

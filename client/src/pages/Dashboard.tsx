@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useCrypto } from "../contexts/CryptoProvider";
 import { useNavigate } from "react-router-dom";
-import { getVaultItems } from "../lib/api";
+import { getVaultItems, type VaultItem } from "../services/vaultService";
 import { getUserId } from "../lib/storage";
 import {
   Heart,
@@ -13,12 +13,6 @@ import {
   Lock,
   Shield,
 } from "lucide-react";
-
-interface VaultItem {
-  id: string;
-  category: string;
-  updated_at: string;
-}
 
 export default function Dashboard() {
   const { isUnlocked } = useCrypto();

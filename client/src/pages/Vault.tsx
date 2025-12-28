@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { useCrypto } from "../contexts/CryptoProvider";
-import { syncVault, getVaultItems } from "../lib/api";
+import {
+  syncVault,
+  getVaultItems,
+  type VaultCategory,
+  type VaultItem,
+} from "../services/vaultService";
 import { getUserId } from "../lib/storage";
 import {
   User,
@@ -12,14 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 
-type Category = "identity" | "allergies" | "medications" | "records";
-
-interface VaultItem {
-  id: string;
-  category: Category;
-  updated_at: string;
-  storage_path: string;
-}
+type Category = VaultCategory;
 
 const CATEGORY_CONFIG: Record<
   Category,
@@ -52,13 +50,14 @@ export default function Vault() {
   const userId = getUserId();
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [vaultItems, setVaultItems] = useState<VaultItem[]>([]);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState<Category | null>(null);
   const [success, setSuccess] = useState<Category | null>(null);
   const [error, setError] = useState<string>("");
 
   // Form data state
-  const [formData, setFormData] = useState<Record<Category, Record<string, string>>>({
+  const [formData, setFormData] = useState<
+    Record<Category, Record<string, string>>
+  >({
     identity: {},
     allergies: {},
     medications: {},
@@ -74,16 +73,13 @@ export default function Vault() {
 
   const loadVaultItems = async () => {
     if (!userId) return;
-    
+
     try {
-      setLoading(true);
       const response = await getVaultItems(userId);
       setVaultItems(response.items || []);
     } catch (err) {
       console.error("Failed to load vault items:", err);
       setError("Failed to load vault items");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -114,7 +110,7 @@ export default function Vault() {
 
       // Get form data for this category
       const data = formData[category];
-      
+
       // Convert to JSON string
       const jsonData = JSON.stringify(data);
 
@@ -130,7 +126,7 @@ export default function Vault() {
         [category]: {},
       }));
       setSuccess(category);
-      
+
       // Reload vault items
       await loadVaultItems();
 
@@ -191,7 +187,10 @@ export default function Vault() {
             );
 
             return (
-              <div key={category} className="collapse collapse-arrow bg-base-200 shadow-lg">
+              <div
+                key={category}
+                className="collapse collapse-arrow bg-base-200 shadow-lg"
+              >
                 <input
                   type="checkbox"
                   checked={isOpen}
@@ -228,7 +227,9 @@ export default function Vault() {
                                 </p>
                                 <p className="text-xs text-neutral/60">
                                   Updated:{" "}
-                                  {new Date(item.updated_at).toLocaleDateString()}
+                                  {new Date(
+                                    item.updated_at
+                                  ).toLocaleDateString()}
                                 </p>
                               </div>
                               <CheckCircle2 className="w-5 h-5 text-primary" />
@@ -254,7 +255,9 @@ export default function Vault() {
                             onChange={(e) =>
                               handleInputChange(category, field, e.target.value)
                             }
-                            placeholder={`Enter ${field.replace(/([A-Z])/g, " $1").toLowerCase()}`}
+                            placeholder={`Enter ${field
+                              .replace(/([A-Z])/g, " $1")
+                              .toLowerCase()}`}
                           />
                         </div>
                       ))}
@@ -296,4 +299,3 @@ export default function Vault() {
     </div>
   );
 }
-
