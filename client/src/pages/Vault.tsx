@@ -8,6 +8,8 @@ import {
   type VaultItem,
 } from "../services/vaultService";
 import { getUserId, isOnboarded } from "../lib/storage";
+import { deriveSessionKeyFromMaster } from "../lib/crypto/sessionKey";
+import { encryptDataToBase64 } from "../lib/crypto/aes";
 import {
   User,
   AlertTriangle,
@@ -47,7 +49,7 @@ const CATEGORY_CONFIG: Record<
 };
 
 export default function Vault() {
-  const { isUnlocked, encryptData } = useCrypto();
+  const { isUnlocked, masterKey } = useCrypto();
   const userId = getUserId();
   const [activeCategory, setActiveCategory] = useState<Category | null>(null);
   const [vaultItems, setVaultItems] = useState<VaultItem[]>([]);
@@ -99,8 +101,15 @@ export default function Vault() {
       console.error("Failed to load vault items:", err);
       // getVaultItems already tries offline vault, so if it still fails,
       // there's no offline vault available
-      const errorMessage = err instanceof Error ? err.message : "Failed to load vault items";
-      setError(`Unable to load vault items. ${errorMessage}. ${navigator.onLine ? "Please try again." : "You're offline. Please download offline vault when online."}`);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to load vault items";
+      setError(
+        `Unable to load vault items. ${errorMessage}. ${
+          navigator.onLine
+            ? "Please try again."
+            : "You're offline. Please download offline vault when online."
+        }`
+      );
     }
   };
 
@@ -135,8 +144,53 @@ export default function Vault() {
       // Convert to JSON string
       const jsonData = JSON.stringify(data);
 
-      // Encrypt the data
-      const { encrypted, iv } = await encryptData(jsonData);
+      // Derive session key from master key
+      // We use a deterministic token based on the fragment to ensure
+      // both encryption and decryption use the same token
+      if (!masterKey) {
+        throw new Error("Master key not available");
+      }
+
+      // Generate the fragment (deterministic)
+      const fragmentPlaintext = new TextEncoder().encode(
+        `mediqr-fragment-${userId}`
+      );
+      const ivInput = new TextEncoder().encode(`mediqr-iv-${userId}`);
+      const ivHash = await crypto.subtle.digest("SHA-256", ivInput);
+      const fixedIV = new Uint8Array(ivHash.slice(0, 12));
+      const encryptedFragment = await crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv: fixedIV,
+          tagLength: 128,
+        },
+        masterKey,
+        fragmentPlaintext
+      );
+      const fragmentBytes = new Uint8Array(encryptedFragment.slice(0, 16));
+
+      // Derive a deterministic token from the fragment
+      // This ensures the same token is used for encryption and decryption
+      const tokenMaterial = await crypto.subtle.digest(
+        "SHA-256",
+        fragmentBytes
+      );
+      const tokenBytes = new Uint8Array(tokenMaterial.slice(0, 32));
+      const deterministicToken = Array.from(tokenBytes)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      console.log(
+        "Deriving session key from master key with deterministic token"
+      );
+      const sessionKey = await deriveSessionKeyFromMaster(
+        masterKey,
+        deterministicToken,
+        userId
+      );
+
+      // Encrypt the data with session key
+      const { encrypted, iv } = await encryptDataToBase64(sessionKey, jsonData);
 
       // Sync to server
       await syncVault(userId, category, encrypted, iv);

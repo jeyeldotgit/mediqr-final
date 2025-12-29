@@ -16,11 +16,14 @@ import {
   AlertCircle,
   Search,
   Loader,
+  BookOpen,
 } from "lucide-react";
+import EducationModal, { useEducationModal } from "../components/EducationModal";
 
 export default function Guardians() {
   const navigate = useNavigate();
   const { masterKey, isUnlocked } = useCrypto();
+  const { topic, isOpen, openModal, closeModal } = useEducationModal();
   const [guardians, setGuardians] = useState<
     Array<{
       id: string;
@@ -237,16 +240,28 @@ export default function Guardians() {
             {/* Info Alert */}
             <div className="alert alert-info">
               <Shield className="w-5 h-5" />
-              <div>
-                <p className="text-sm font-semibold">
-                  How Social Recovery Works
-                </p>
-                <p className="text-xs mt-1">
-                  Your master key is split into 3 shards using Shamir's Secret
-                  Sharing. You need any 2 of 3 shards to recover your account.
-                  One shard is stored locally, one with a guardian, and one as a
-                  backup in Supabase.
-                </p>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">
+                      How Social Recovery Works
+                    </p>
+                    <p className="text-xs mt-1">
+                      Your master key is split into 3 shards using Shamir's Secret
+                      Sharing. You need any 2 of 3 shards to recover your account.
+                      One shard is stored locally, one with a guardian, and one as a
+                      backup in Supabase.
+                    </p>
+                  </div>
+                  <button
+                    className="btn btn-sm btn-ghost ml-4"
+                    onClick={() => openModal("guardians")}
+                    aria-label="Learn more about guardians"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Learn More
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -399,6 +414,9 @@ export default function Guardians() {
           </div>
         </div>
       </div>
+
+      {/* Education Modal */}
+      <EducationModal topic={topic} isOpen={isOpen} onClose={closeModal} />
     </div>
   );
 }

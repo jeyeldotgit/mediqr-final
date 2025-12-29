@@ -17,6 +17,7 @@ import {
 } from "../controllers/recoveryController";
 import { searchUsers } from "../controllers/guardianController";
 import { breakGlass } from "../controllers/emergencyController";
+import { rateLimiters } from "../middleware/rateLimiter";
 
 const router = Router();
 
@@ -25,19 +26,23 @@ router.get("/health", (_req, res) => {
   res.json({ status: "ok", service: "mediqr-server" });
 });
 
-// Auth endpoints
-router.post("/auth/init", initAuth);
+// Auth endpoints (strict rate limiting)
+router.post("/auth/init", rateLimiters.auth, initAuth);
 
-// Vault endpoints
-router.post("/vault/sync", syncVault);
-router.get("/vault/:ownerId", getVaultItems);
-router.get("/vault/:ownerId/offline", getVaultItemsForOffline);
+// Vault endpoints (moderate rate limiting)
+router.post("/vault/sync", rateLimiters.vault, syncVault);
+router.get("/vault/:ownerId", rateLimiters.vault, getVaultItems);
+router.get(
+  "/vault/:ownerId/offline",
+  rateLimiters.vault,
+  getVaultItemsForOffline
+);
 
-// QR token endpoints
-router.post("/qr/rotate", rotateQRToken);
+// QR token endpoints (strict rate limiting)
+router.post("/qr/rotate", rateLimiters.qrRotate, rotateQRToken);
 
-// Staff endpoints
-router.post("/staff/auth", staffAuth);
+// Staff endpoints (strict rate limiting for auth)
+router.post("/staff/auth", rateLimiters.auth, staffAuth);
 
 // Record access endpoints (requires staff authentication)
 router.post("/record/access", recordAccess);
@@ -52,7 +57,7 @@ router.post("/social/shard", storeGuardianShard);
 // Guardian endpoints
 router.post("/guardians/search", searchUsers);
 
-// Emergency endpoints (requires er_admin role)
-router.post("/emergency/break-glass", breakGlass);
+// Emergency endpoints (very strict rate limiting)
+router.post("/emergency/break-glass", rateLimiters.emergency, breakGlass);
 
 export default router;

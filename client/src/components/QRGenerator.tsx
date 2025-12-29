@@ -3,7 +3,8 @@ import { useCrypto } from "../contexts/CryptoProvider";
 import { rotateQRToken } from "../services/qrService";
 import { getUserId } from "../lib/storage";
 import { getOfflineVault } from "../services/offlineVaultService";
-import { QrCode, RefreshCw, Copy, Check, WifiOff, AlertTriangle } from "lucide-react";
+import { QrCode, RefreshCw, Copy, Check, WifiOff, AlertTriangle, BookOpen } from "lucide-react";
+import EducationModal, { useEducationModal } from "./EducationModal";
 
 /**
  * QRGenerator Component
@@ -17,6 +18,7 @@ import { QrCode, RefreshCw, Copy, Check, WifiOff, AlertTriangle } from "lucide-r
 export default function QRGenerator() {
   const { isUnlocked, masterKey } = useCrypto();
   const userId = getUserId();
+  const { topic, isOpen, openModal, closeModal } = useEducationModal();
   const [qrData, setQrData] = useState<string | null>(null);
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -264,6 +266,9 @@ export default function QRGenerator() {
           </div>
         )}
       </div>
+
+      {/* Education Modal */}
+      <EducationModal topic={topic} isOpen={isOpen} onClose={closeModal} />
     </div>
   );
 }

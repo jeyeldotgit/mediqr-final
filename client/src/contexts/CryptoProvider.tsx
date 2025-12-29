@@ -3,6 +3,8 @@ import {
   useContext,
   useState,
   useCallback,
+  useEffect,
+  useRef,
   type ReactNode,
 } from "react";
 import { deriveMEKFromMnemonic } from "../lib/crypto/keyDerivation";
@@ -22,9 +24,14 @@ interface CryptoContextType {
 
 const CryptoContext = createContext<CryptoContextType | undefined>(undefined);
 
+// Idle timeout in milliseconds (default: 15 minutes)
+const IDLE_TIMEOUT = 15 * 60 * 1000;
+
 export function CryptoProvider({ children }: { children: ReactNode }) {
   const [masterKey, setMasterKey] = useState<CryptoKey | null>(null);
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
 
   const unlock = useCallback(async (mnemonic: string) => {
     try {
@@ -53,19 +60,74 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const lock = useCallback(() => {
+  // Clear master key from memory
+  const clearMasterKey = useCallback(() => {
+    // Note: CryptoKey objects cannot be explicitly cleared in JavaScript,
+    // but setting to null removes the reference and allows GC
     setMasterKey(null);
     setIsUnlocked(false);
+    
+    // Clear any stored references
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
   }, []);
+
+  const lock = useCallback(() => {
+    clearMasterKey();
+  }, [clearMasterKey]);
+
+  // Reset idle timer on activity
+  const resetIdleTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
+    
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+    }
+    
+    if (isUnlocked && masterKey) {
+      idleTimerRef.current = setTimeout(() => {
+        console.log("[CryptoProvider] Idle timeout - locking vault");
+        clearMasterKey();
+      }, IDLE_TIMEOUT);
+    }
+  }, [isUnlocked, masterKey, clearMasterKey]);
+
+  // Track user activity
+  useEffect(() => {
+    if (!isUnlocked) return;
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart"];
+    const handleActivity = () => {
+      resetIdleTimer();
+    };
+
+    events.forEach((event) => {
+      window.addEventListener(event, handleActivity, { passive: true });
+    });
+
+    resetIdleTimer();
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, handleActivity);
+      });
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+    };
+  }, [isUnlocked, resetIdleTimer]);
 
   const encryptData = useCallback(
     async (plaintext: string): Promise<{ encrypted: string; iv: string }> => {
       if (!masterKey) {
         throw new Error("Master key not available. Please unlock first.");
       }
+      resetIdleTimer();
       return encryptDataToBase64(masterKey, plaintext);
     },
-    [masterKey]
+    [masterKey, resetIdleTimer]
   );
 
   const decryptData = useCallback(
@@ -73,9 +135,10 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
       if (!masterKey) {
         throw new Error("Master key not available. Please unlock first.");
       }
+      resetIdleTimer();
       return decryptDataFromBase64(masterKey, encrypted, iv);
     },
-    [masterKey]
+    [masterKey, resetIdleTimer]
   );
 
   return (

@@ -88,10 +88,52 @@ export async function decryptDataFromBase64(
   encrypted: string,
   iv: string
 ): Promise<string> {
-  const ciphertextBuffer = base64ToArrayBuffer(encrypted);
-  const ivBuffer = new Uint8Array(base64ToArrayBuffer(iv));
-  
-  return decryptData(masterKey, ciphertextBuffer, ivBuffer);
+  try {
+    // Validate inputs
+    if (!encrypted || !iv) {
+      throw new Error("Encrypted data and IV are required");
+    }
+
+    // Decode base64 strings to ArrayBuffers
+    let ciphertextBuffer: ArrayBuffer;
+    let ivBuffer: Uint8Array;
+
+    try {
+      ciphertextBuffer = base64ToArrayBuffer(encrypted);
+    } catch (error) {
+      throw new Error(
+        `Failed to decode encrypted data: ${
+          error instanceof Error ? error.message : "Invalid base64"
+        }`
+      );
+    }
+
+    try {
+      const ivArrayBuffer = base64ToArrayBuffer(iv);
+      ivBuffer = new Uint8Array(ivArrayBuffer);
+    } catch (error) {
+      throw new Error(
+        `Failed to decode IV: ${
+          error instanceof Error ? error.message : "Invalid base64"
+        }. IV value: ${iv.substring(0, 50)}...`
+      );
+    }
+
+    // Validate IV length (should be 12 bytes for AES-GCM)
+    if (ivBuffer.length !== 12) {
+      throw new Error(
+        `Invalid IV length: expected 12 bytes, got ${ivBuffer.length} bytes`
+      );
+    }
+
+    return decryptData(masterKey, ciphertextBuffer, ivBuffer);
+  } catch (error) {
+    throw new Error(
+      `Decryption failed: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
 }
 
 /**
@@ -108,13 +150,35 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 /**
  * Helper: Convert base64 to ArrayBuffer
+ * Handles URL-safe base64 and validates input
  */
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  try {
+    // Handle URL-safe base64 (replace - with + and _ with /)
+    let normalizedBase64 = base64.replace(/-/g, "+").replace(/_/g, "/");
+    
+    // Add padding if needed
+    while (normalizedBase64.length % 4) {
+      normalizedBase64 += "=";
+    }
+    
+    // Validate base64 format (basic check)
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalizedBase64)) {
+      throw new Error("Invalid base64 format");
+    }
+    
+    const binary = atob(normalizedBase64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (error) {
+    throw new Error(
+      `Failed to decode base64: ${
+        error instanceof Error ? error.message : "Invalid base64 string"
+      }`
+    );
   }
-  return bytes.buffer;
 }
 

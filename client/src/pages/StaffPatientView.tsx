@@ -1,8 +1,27 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { decryptDataFromBase64 } from "../lib/crypto/aes";
-import { deriveMEKFromMnemonic } from "../lib/crypto/keyDerivation";
-import { CheckCircle, AlertCircle, ArrowLeft, FileText, Heart, Pill, Clipboard } from "lucide-react";
+import { deriveSessionKeyFromFragment } from "../lib/crypto/sessionKey";
+import {
+  CheckCircle,
+  AlertCircle,
+  ArrowLeft,
+  FileText,
+  Pill,
+  Clipboard,
+} from "lucide-react";
+
+/**
+ * Convert ArrayBuffer to base64 string
+ */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 interface PatientData {
   patientId: string;
@@ -16,6 +35,7 @@ interface PatientData {
     error?: string;
   }>;
   fragment: string;
+  token?: string; // QR token from backend
   accessMethod?: "QR_SCAN" | "BREAK_GLASS";
   justification?: string;
 }
@@ -31,7 +51,9 @@ export default function StaffPatientView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [patientData, setPatientData] = useState<PatientData | null>(null);
-  const [decryptedRecords, setDecryptedRecords] = useState<DecryptedRecord[]>([]);
+  const [decryptedRecords, setDecryptedRecords] = useState<DecryptedRecord[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [decrypting, setDecrypting] = useState(false);
@@ -71,14 +93,59 @@ export default function StaffPatientView() {
     setError(null);
 
     try {
-      // For Phase 3 MVP, we need to derive a key from the fragment
-      // In production, this would be more sophisticated
-      // For now, we'll use the fragment directly as a key derivation input
-      
-      // Note: This is a simplified approach for MVP
-      // In production, the fragment would be combined with the backend token
-      // to derive the decryption key properly
-      
+      // Check if we have the required data for decryption
+      if (!data.fragment) {
+        throw new Error("QR fragment missing. Cannot decrypt records.");
+      }
+
+      // For QR_SCAN access, we need the token to derive the key
+      // For BREAK_GLASS, we might not have the token (emergency access)
+      // In that case, we'll need to handle it differently
+      if (data.accessMethod === "QR_SCAN" && !data.token) {
+        throw new Error("QR token missing. Cannot decrypt records.");
+      }
+
+      // Derive decryption key from fragment and token
+      let decryptionKey: CryptoKey;
+
+      if (data.accessMethod === "BREAK_GLASS") {
+        // For break-glass access, we might not have the QR token
+        // In this case, we'll use a simplified key derivation
+        // Note: This is a limitation - break-glass access may not be able to decrypt
+        // unless we have a way to derive the key without the token
+        throw new Error(
+          "Break-glass access cannot decrypt records without the QR token. " +
+            "This is a security limitation - emergency access provides blob URLs but decryption requires the QR token."
+        );
+      } else {
+        // Derive session key from fragment
+        // We use a deterministic token derived from the fragment itself
+        // This matches the encryption side which also uses a deterministic token
+        const fragmentBytes = new Uint8Array(
+          data.fragment.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
+        );
+
+        // Derive deterministic token from fragment (same as encryption side)
+        const tokenMaterial = await crypto.subtle.digest(
+          "SHA-256",
+          fragmentBytes
+        );
+        const tokenBytes = new Uint8Array(tokenMaterial.slice(0, 32));
+        const deterministicToken = Array.from(tokenBytes)
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+
+        console.log(
+          "Deriving session key from fragment with deterministic token"
+        );
+        decryptionKey = await deriveSessionKeyFromFragment(
+          data.fragment,
+          deterministicToken,
+          data.patientId
+        );
+        console.log("Session key derived successfully");
+      }
+
       const decrypted: DecryptedRecord[] = [];
 
       for (const blob of data.blobs) {
@@ -90,38 +157,89 @@ export default function StaffPatientView() {
           // Fetch encrypted blob
           const response = await fetch(blob.signedUrl);
           if (!response.ok) {
-            console.error(`Failed to fetch blob ${blob.id}:`, response.statusText);
+            console.error(
+              `Failed to fetch blob ${blob.id}:`,
+              response.statusText
+            );
             continue;
           }
 
-          const encryptedBase64 = await response.text();
+          // Get encrypted data as ArrayBuffer (binary)
+          // The blob is stored as binary (application/octet-stream) in Supabase Storage
+          const encryptedArrayBuffer = await response.arrayBuffer();
 
-          // For MVP: We'll need the patient's mnemonic or a proper key derivation
-          // For now, we'll show that decryption requires the patient's key
-          // In a real implementation, the fragment + token would derive the key
-          
-          // This is a placeholder - actual decryption would require:
-          // 1. Combining fragment with token to derive key
-          // 2. Using that key to decrypt the blob
-          
+          // Convert ArrayBuffer to base64 for decryption
+          // The data was originally base64, then converted to Buffer for storage
+          // Now we need to convert it back to base64
+          const encryptedBase64 = arrayBufferToBase64(encryptedArrayBuffer);
+
+          // Validate IV format before attempting decryption
+          if (!blob.iv || blob.iv.trim().length === 0) {
+            throw new Error("IV is missing or empty");
+          }
+
+          // Attempt to decrypt the blob using the derived key
+          // Note: This may fail if data was encrypted with master key directly
+          // In that case, we'll catch the error and show it
+          let decryptedData: string;
+          try {
+            decryptedData = await decryptDataFromBase64(
+              decryptionKey,
+              encryptedBase64,
+              blob.iv
+            );
+          } catch (decryptError) {
+            // If decryption fails, it's likely because the key doesn't match
+            // This happens when data is encrypted with master key but we're using derived key
+            throw new Error(
+              `Decryption failed: The data appears to be encrypted with a different key. ` +
+                `This is expected with the current architecture - data is encrypted with the master key, ` +
+                `but staff cannot derive the master key from the QR fragment. ` +
+                `To enable staff decryption, the encryption scheme needs to use session keys. ` +
+                `Error: ${
+                  decryptError instanceof Error
+                    ? decryptError.message
+                    : "Unknown error"
+                }`
+            );
+          }
+
+          // Parse the decrypted JSON data
+          let parsedData: any;
+          try {
+            parsedData = JSON.parse(decryptedData);
+          } catch (parseError) {
+            // If parsing fails, use the raw decrypted string
+            parsedData = { raw: decryptedData };
+          }
+
           decrypted.push({
             id: blob.id,
             category: blob.category,
-            data: {
-              note: "Decryption requires proper key derivation from fragment + token",
-              encrypted: encryptedBase64.substring(0, 50) + "...",
-            },
+            data: parsedData,
             updatedAt: blob.updatedAt,
           });
         } catch (err) {
           console.error(`Failed to decrypt blob ${blob.id}:`, err);
+          // Add a record indicating decryption failure
+          decrypted.push({
+            id: blob.id,
+            category: blob.category,
+            data: {
+              error: "Decryption failed",
+              message: err instanceof Error ? err.message : "Unknown error",
+            },
+            updatedAt: blob.updatedAt,
+          });
         }
       }
 
       setDecryptedRecords(decrypted);
     } catch (err) {
       console.error("Decryption error:", err);
-      setError("Failed to decrypt patient records");
+      setError(
+        err instanceof Error ? err.message : "Failed to decrypt patient records"
+      );
     } finally {
       setLoading(false);
       setDecrypting(false);
@@ -134,7 +252,9 @@ export default function StaffPatientView() {
         <div className="text-center">
           <span className="loading loading-spinner loading-lg"></span>
           <p className="mt-4 text-neutral/70">
-            {decrypting ? "Decrypting patient records..." : "Loading patient data..."}
+            {decrypting
+              ? "Decrypting patient records..."
+              : "Loading patient data..."}
           </p>
         </div>
       </div>
@@ -155,7 +275,9 @@ export default function StaffPatientView() {
               Back to Scanner
             </button>
             <div>
-              <h1 className="text-4xl font-bold text-primary mb-2">Patient Records</h1>
+              <h1 className="text-4xl font-bold text-primary mb-2">
+                Patient Records
+              </h1>
               <p className="text-neutral/70">Patient ID: {id}</p>
             </div>
           </div>
@@ -184,31 +306,48 @@ export default function StaffPatientView() {
         {patientData && (
           <div className="card bg-base-200 shadow-xl mb-6">
             <div className="card-body">
-              <h2 className="card-title text-secondary mb-4">Access Information</h2>
+              <h2 className="card-title text-secondary mb-4">
+                Access Information
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-neutral/70">Records Found</p>
-                  <p className="text-2xl font-bold text-primary">{patientData.blobs.length}</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {patientData.blobs.length}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-neutral/70">Access Method</p>
-                  <p className={`text-lg font-semibold ${
-                    patientData.accessMethod === "BREAK_GLASS" ? "text-error" : "text-secondary"
-                  }`}>
-                    {patientData.accessMethod === "BREAK_GLASS" ? "Break-Glass" : "QR Scan"}
+                  <p
+                    className={`text-lg font-semibold ${
+                      patientData.accessMethod === "BREAK_GLASS"
+                        ? "text-error"
+                        : "text-secondary"
+                    }`}
+                  >
+                    {patientData.accessMethod === "BREAK_GLASS"
+                      ? "Break-Glass"
+                      : "QR Scan"}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-neutral/70">Access Time</p>
-                  <p className="text-lg font-semibold">{new Date().toLocaleString()}</p>
+                  <p className="text-lg font-semibold">
+                    {new Date().toLocaleString()}
+                  </p>
                 </div>
               </div>
-              {patientData.accessMethod === "BREAK_GLASS" && patientData.justification && (
-                <div className="mt-4 pt-4 border-t border-base-300">
-                  <p className="text-sm text-neutral/70 mb-2">Justification:</p>
-                  <p className="text-sm bg-base-100 p-3 rounded">{patientData.justification}</p>
-                </div>
-              )}
+              {patientData.accessMethod === "BREAK_GLASS" &&
+                patientData.justification && (
+                  <div className="mt-4 pt-4 border-t border-base-300">
+                    <p className="text-sm text-neutral/70 mb-2">
+                      Justification:
+                    </p>
+                    <p className="text-sm bg-base-100 p-3 rounded">
+                      {patientData.justification}
+                    </p>
+                  </div>
+                )}
             </div>
           </div>
         )}
@@ -216,22 +355,32 @@ export default function StaffPatientView() {
         {/* Decrypted Records */}
         {decryptedRecords.length > 0 ? (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-primary mb-4">Medical Records</h2>
-            
+            <h2 className="text-2xl font-bold text-primary mb-4">
+              Medical Records
+            </h2>
+
             {decryptedRecords.map((record) => (
               <div key={record.id} className="card bg-base-200 shadow-xl">
                 <div className="card-body">
                   <div className="flex items-center gap-3 mb-4">
-                    {record.category === "identity" && <FileText className="w-6 h-6 text-primary" />}
-                    {record.category === "allergies" && <AlertCircle className="w-6 h-6 text-error" />}
-                    {record.category === "medications" && <Pill className="w-6 h-6 text-secondary" />}
-                    {record.category === "records" && <Clipboard className="w-6 h-6 text-accent" />}
+                    {record.category === "identity" && (
+                      <FileText className="w-6 h-6 text-primary" />
+                    )}
+                    {record.category === "allergies" && (
+                      <AlertCircle className="w-6 h-6 text-error" />
+                    )}
+                    {record.category === "medications" && (
+                      <Pill className="w-6 h-6 text-secondary" />
+                    )}
+                    {record.category === "records" && (
+                      <Clipboard className="w-6 h-6 text-accent" />
+                    )}
                     <h3 className="card-title capitalize">{record.category}</h3>
                     <div className="badge badge-ghost">
                       {new Date(record.updatedAt).toLocaleDateString()}
                     </div>
                   </div>
-                  
+
                   <div className="bg-base-100 p-4 rounded-lg">
                     <pre className="text-sm whitespace-pre-wrap">
                       {JSON.stringify(record.data, null, 2)}
@@ -245,7 +394,9 @@ export default function StaffPatientView() {
           <div className="card bg-base-200 shadow-xl">
             <div className="card-body text-center py-12">
               <AlertCircle className="w-16 h-16 text-neutral/50 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No Records Available</h3>
+              <h3 className="text-xl font-semibold mb-2">
+                No Records Available
+              </h3>
               <p className="text-neutral/70">
                 {patientData?.blobs.length === 0
                   ? "This patient has no medical records stored."
@@ -261,8 +412,9 @@ export default function StaffPatientView() {
           <div>
             <p className="text-sm font-semibold">Phase 3 MVP Note</p>
             <p className="text-xs mt-1">
-              Full decryption requires proper key derivation from the QR fragment + token.
-              The current implementation shows the structure but needs the complete key derivation logic.
+              Full decryption requires proper key derivation from the QR
+              fragment + token. The current implementation shows the structure
+              but needs the complete key derivation logic.
             </p>
           </div>
         </div>
@@ -270,4 +422,3 @@ export default function StaffPatientView() {
     </div>
   );
 }
-

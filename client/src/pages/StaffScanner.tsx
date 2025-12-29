@@ -1,7 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { recordAccess } from "../services/staffService";
-import { QrCode, Camera, AlertCircle, CheckCircle, ArrowRight, Shield } from "lucide-react";
+import {
+  QrCode,
+  Camera,
+  AlertCircle,
+  CheckCircle,
+  ArrowRight,
+  Shield,
+} from "lucide-react";
 
 export default function StaffScanner() {
   const navigate = useNavigate();
@@ -26,7 +33,7 @@ export default function StaffScanner() {
     return () => {
       // Cleanup: stop camera stream
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, [staffToken, navigate]);
@@ -51,7 +58,7 @@ export default function StaffScanner() {
 
   const stopCamera = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     if (videoRef.current) {
@@ -83,17 +90,23 @@ export default function StaffScanner() {
       );
 
       // Store patient data and navigate to patient view
-      localStorage.setItem("mediqr_patient_data", JSON.stringify({
-        patientId: userId,
-        blobs: response.blobs,
-        fragment: fragment, // Store fragment for decryption
-        accessMethod: "QR_SCAN",
-      }));
+      localStorage.setItem(
+        "mediqr_patient_data",
+        JSON.stringify({
+          patientId: userId,
+          blobs: response.blobs,
+          fragment: fragment, // Store fragment for decryption
+          token: token, // Store token for key derivation
+          accessMethod: "QR_SCAN",
+        })
+      );
 
       navigate(`/staff/patient-view/${userId}`);
     } catch (err) {
       console.error("QR scan error:", err);
-      setError(err instanceof Error ? err.message : "Failed to process QR code");
+      setError(
+        err instanceof Error ? err.message : "Failed to process QR code"
+      );
       setLoading(false);
     }
   };
@@ -120,7 +133,8 @@ export default function StaffScanner() {
               Scan patient MediQR code to access records
             </p>
             <p className="text-sm text-neutral/60 mt-1">
-              Role: <span className="font-semibold capitalize">{staffRole}</span>
+              Role:{" "}
+              <span className="font-semibold capitalize">{staffRole}</span>
             </p>
           </div>
           <div className="flex gap-2">
@@ -179,17 +193,11 @@ export default function StaffScanner() {
                   Start camera to scan patient QR code
                 </p>
                 <div className="flex gap-4 justify-center">
-                  <button
-                    className="btn btn-secondary"
-                    onClick={startCamera}
-                  >
+                  <button className="btn btn-secondary" onClick={startCamera}>
                     <Camera className="w-5 h-5 mr-2" />
                     Start Camera
                   </button>
-                  <button
-                    className="btn btn-ghost"
-                    onClick={handleManualInput}
-                  >
+                  <button className="btn btn-ghost" onClick={handleManualInput}>
                     Manual Input
                   </button>
                 </div>
@@ -214,17 +222,16 @@ export default function StaffScanner() {
                   <p className="text-sm text-neutral/70 mb-4">
                     Position QR code within the frame
                   </p>
-                  <button
-                    className="btn btn-ghost"
-                    onClick={stopCamera}
-                  >
+                  <button className="btn btn-ghost" onClick={stopCamera}>
                     Stop Camera
                   </button>
                 </div>
                 <div className="alert alert-info">
                   <AlertCircle className="w-5 h-5" />
                   <div>
-                    <p className="text-sm font-semibold">QR Scanner Library Required</p>
+                    <p className="text-sm font-semibold">
+                      QR Scanner Library Required
+                    </p>
                     <p className="text-xs mt-1">
                       Install: npm install html5-qrcode or react-qr-reader
                     </p>
@@ -244,9 +251,13 @@ export default function StaffScanner() {
             <h3 className="font-semibold text-primary mb-2">How to Use</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm text-neutral/80">
               <li>Click "Start Camera" to activate your device camera</li>
-              <li>Position the patient's MediQR code within the scanning frame</li>
+              <li>
+                Position the patient's MediQR code within the scanning frame
+              </li>
               <li>The QR code will be automatically scanned and processed</li>
-              <li>You'll be redirected to view the patient's encrypted records</li>
+              <li>
+                You'll be redirected to view the patient's encrypted records
+              </li>
             </ol>
           </div>
         </div>
@@ -254,4 +265,3 @@ export default function StaffScanner() {
     </div>
   );
 }
-

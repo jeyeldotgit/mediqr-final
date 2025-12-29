@@ -8,6 +8,8 @@ import { useCrypto } from "../contexts/CryptoProvider";
 import { setOnboarded, storeMnemonic, storeLocalShard, storeUserId } from "../lib/storage";
 import { initProfile } from "../services/authService";
 import { derivePublicKey, hashIdentifier } from "../lib/crypto/identifier";
+import EducationModal, { useEducationModal } from "../components/EducationModal";
+import { BookOpen } from "lucide-react";
 
 type Step = "generate" | "verify" | "complete";
 
@@ -20,6 +22,7 @@ export default function Onboarding() {
   const [isLoading, setIsLoading] = useState(false);
   const { unlock } = useCrypto();
   const navigate = useNavigate();
+  const { topic, isOpen, openModal, closeModal } = useEducationModal();
 
   // Generate mnemonic on mount
   useEffect(() => {
@@ -157,11 +160,21 @@ export default function Onboarding() {
           {step === "generate" && (
             <div className="space-y-6">
               <div className="alert alert-warning">
-                <span>
-                  <strong>Important:</strong> Write down these 12 words in order
-                  and store them securely. You'll need them to access your
-                  account.
-                </span>
+                <div className="flex items-start gap-3">
+                  <span>
+                    <strong>Important:</strong> Write down these 12 words in order
+                    and store them securely. You'll need them to access your
+                    account.
+                  </span>
+                  <button
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => openModal("mnemonic")}
+                    aria-label="Learn more about recovery phrases"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Learn More
+                  </button>
+                </div>
               </div>
 
               <div className="bg-base-300 p-6 rounded-lg">
@@ -277,6 +290,9 @@ export default function Onboarding() {
           )}
         </div>
       </div>
+
+      {/* Education Modal */}
+      <EducationModal topic={topic} isOpen={isOpen} onClose={closeModal} />
     </div>
   );
 }
