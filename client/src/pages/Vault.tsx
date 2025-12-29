@@ -94,9 +94,13 @@ export default function Vault() {
     try {
       const response = await getVaultItems(userId);
       setVaultItems(response.items || []);
+      setError(""); // Clear any previous errors
     } catch (err) {
       console.error("Failed to load vault items:", err);
-      setError("Failed to load vault items");
+      // getVaultItems already tries offline vault, so if it still fails,
+      // there's no offline vault available
+      const errorMessage = err instanceof Error ? err.message : "Failed to load vault items";
+      setError(`Unable to load vault items. ${errorMessage}. ${navigator.onLine ? "Please try again." : "You're offline. Please download offline vault when online."}`);
     }
   };
 

@@ -27,10 +27,19 @@ async function apiRequest<T>(
     headers["x-user-id"] = userId;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (networkError) {
+    // Handle network errors (fetch failed, no response received)
+    // This happens when the server is unreachable or network is down
+    throw new Error(
+      `Network error: Unable to reach server. ${networkError instanceof Error ? networkError.message : "Please check your connection."}`
+    );
+  }
 
   if (!response.ok) {
     const error = await response

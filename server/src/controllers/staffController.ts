@@ -28,23 +28,23 @@ export async function staffAuth(req: Request, res: Response) {
     // In production, verify against professional registry
     // For now, we'll check if staff profile exists or create one
 
-    // Check if staff profile exists
-    const { data: existingProfile, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, role, is_verified")
-      .eq("role", role)
-      .single();
+    // First, try to sign in with Supabase Auth to check if user exists
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
 
     let staffId: string;
     let isNewUser = false;
 
-    if (profileError || !existingProfile) {
-      // Create new staff profile
+    if (authError || !authData?.user) {
+      // User doesn't exist or wrong password - create new account
       // In production, this would require verification against professional registry
       staffId = randomUUID();
 
       // Create auth user
-      const { data: authData, error: authError } =
+      const { data: newAuthData, error: createAuthError } =
         await supabase.auth.admin.createUser({
           id: staffId,
           email: email,
@@ -52,11 +52,11 @@ export async function staffAuth(req: Request, res: Response) {
           email_confirm: true,
         });
 
-      if (authError) {
-        console.error("Auth user creation error:", authError);
+      if (createAuthError) {
+        console.error("Auth user creation error:", createAuthError);
         return res.status(500).json({
           error: "Failed to create auth user",
-          details: authError.message,
+          details: createAuthError.message,
         });
       }
 
@@ -79,23 +79,38 @@ export async function staffAuth(req: Request, res: Response) {
 
       isNewUser = true;
     } else {
-      // Existing staff - verify password
-      // For Phase 3 MVP, we'll use Supabase Auth to verify
-      // In production, integrate with professional registry
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email: email,
-          password: password,
+      // User exists - verify they have a profile and role matches
+      staffId = authData.user.id;
+
+      // Check if profile exists and role matches
+      const { data: existingProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, role, is_verified")
+        .eq("id", staffId)
+        .single();
+
+      if (profileError || !existingProfile) {
+        // Profile doesn't exist - create it
+        const { error: insertError } = await supabase.from("profiles").insert({
+          id: staffId,
+          role: role,
+          is_verified: false,
+          public_key: null,
         });
 
-      if (authError || !authData?.user) {
-        return res.status(401).json({
-          error: "Authentication failed",
-          details: "Invalid email or password",
+        if (insertError) {
+          return res.status(500).json({
+            error: "Failed to create profile",
+            details: insertError.message,
+          });
+        }
+      } else if (existingProfile.role !== role) {
+        // Role mismatch - user is trying to login with different role
+        return res.status(403).json({
+          error: "Role mismatch",
+          details: `This account is registered as ${existingProfile.role}, not ${role}. Please select the correct role.`,
         });
       }
-
-      staffId = existingProfile.id;
     }
 
     // Issue JWT token

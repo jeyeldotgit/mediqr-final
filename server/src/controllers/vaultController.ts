@@ -119,6 +119,87 @@ export async function syncVault(req: Request, res: Response) {
 }
 
 /**
+ * GET /api/vault/:ownerId/offline
+ * Get vault items with signed URLs for offline download
+ * Signed URLs have longer expiry (24 hours) for offline use
+ */
+export async function getVaultItemsForOffline(req: Request, res: Response) {
+  try {
+    const { ownerId } = req.params;
+
+    if (
+      !ownerId ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        ownerId
+      )
+    ) {
+      return res.status(400).json({
+        error: "Invalid owner ID",
+        details: "Owner ID must be a valid UUID",
+      });
+    }
+
+    // Get all vault items for this owner
+    const { data: blobs, error: blobsError } = await supabase
+      .from("medical_blobs")
+      .select("id, category, updated_at, storage_path, iv")
+      .eq("owner_id", ownerId)
+      .order("updated_at", { ascending: false });
+
+    if (blobsError) {
+      console.error("Database error:", blobsError);
+      return res.status(500).json({
+        error: "Failed to fetch vault items",
+        details: blobsError.message,
+      });
+    }
+
+    // Generate signed URLs with longer expiry (24 hours) for offline use
+    const itemsWithUrls = await Promise.all(
+      (blobs || []).map(async (blob) => {
+        const { data: signedUrlData, error: urlError } = await supabase.storage
+          .from("vault")
+          .createSignedUrl(blob.storage_path, 86400); // 24 hours expiry
+
+        if (urlError) {
+          console.error("Error generating signed URL:", urlError);
+          return {
+            id: blob.id,
+            category: blob.category,
+            storagePath: blob.storage_path,
+            iv: blob.iv,
+            updatedAt: blob.updated_at,
+            signedUrl: null,
+            error: "Failed to generate access URL",
+          };
+        }
+
+        return {
+          id: blob.id,
+          category: blob.category,
+          storagePath: blob.storage_path,
+          iv: blob.iv,
+          updatedAt: blob.updated_at,
+          signedUrl: signedUrlData?.signedUrl || null,
+        };
+      })
+    );
+
+    res.json({
+      success: true,
+      items: itemsWithUrls,
+      count: itemsWithUrls.length,
+    });
+  } catch (error) {
+    console.error("Unexpected error in getVaultItemsForOffline:", error);
+    res.status(500).json({
+      error: "Internal server error",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+
+/**
  * GET /api/vault/:ownerId
  * Get all vault items for a specific owner (metadata only, not the encrypted data)
  */
@@ -139,11 +220,24 @@ export async function getVaultItems(req: Request, res: Response) {
     }
 
     // Get all vault items for this owner
-    const { data, error } = await supabase
-      .from("medical_blobs")
-      .select("id, category, updated_at, storage_path")
-      .eq("owner_id", ownerId)
-      .order("updated_at", { ascending: false });
+    let data, error;
+    try {
+      const result = await supabase
+        .from("medical_blobs")
+        .select("id, category, updated_at, storage_path")
+        .eq("owner_id", ownerId)
+        .order("updated_at", { ascending: false });
+      data = result.data;
+      error = result.error;
+    } catch (networkError) {
+      // Handle network errors (e.g., Supabase connection failure)
+      console.error("Network error connecting to Supabase:", networkError);
+      return res.status(503).json({
+        error: "Service unavailable",
+        details: "Unable to connect to database. Please try again later or use offline mode.",
+        offline: true,
+      });
+    }
 
     if (error) {
       console.error("Database error:", error);

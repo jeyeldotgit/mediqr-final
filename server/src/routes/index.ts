@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { initAuth } from "../controllers/authController";
-import { syncVault, getVaultItems } from "../controllers/vaultController";
+import {
+  syncVault,
+  getVaultItems,
+  getVaultItemsForOffline,
+} from "../controllers/vaultController";
 import { rotateQRToken } from "../controllers/qrController";
 import { staffAuth } from "../controllers/staffController";
 import { recordAccess } from "../controllers/recordController";
@@ -27,6 +31,7 @@ router.post("/auth/init", initAuth);
 // Vault endpoints
 router.post("/vault/sync", syncVault);
 router.get("/vault/:ownerId", getVaultItems);
+router.get("/vault/:ownerId/offline", getVaultItemsForOffline);
 
 // QR token endpoints
 router.post("/qr/rotate", rotateQRToken);

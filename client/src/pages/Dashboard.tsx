@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { getVaultItems, type VaultItem } from "../services/vaultService";
 import { getUserId, isOnboarded } from "../lib/storage";
 import QRGenerator from "../components/QRGenerator";
+import EmergencyCard from "../components/EmergencyCard";
 import {
-  Heart,
   QrCode,
   Settings,
   FileText,
@@ -57,6 +57,8 @@ export default function Dashboard() {
       }
     } catch (err) {
       console.error("Failed to load vault summary:", err);
+      // Error is already handled by getVaultItems fallback to offline vault
+      // If it still fails, vaultItems will remain empty (which is fine)
     } finally {
       setLoading(false);
     }
@@ -258,6 +260,11 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Emergency & Offline Mode Card */}
+        <div className="mt-6">
+          <EmergencyCard />
         </div>
 
         {/* QR Generator Section */}

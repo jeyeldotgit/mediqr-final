@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useCrypto } from "../contexts/CryptoProvider";
 import { rotateQRToken } from "../services/qrService";
 import { getUserId } from "../lib/storage";
-import { QrCode, RefreshCw, Copy, Check } from "lucide-react";
+import { getOfflineVault } from "../services/offlineVaultService";
+import { QrCode, RefreshCw, Copy, Check, WifiOff, AlertTriangle } from "lucide-react";
 
 /**
  * QRGenerator Component
@@ -78,9 +79,34 @@ export default function QRGenerator() {
       setLoading(true);
       setError(null);
 
-      // Get backend token
-      const tokenResponse = await rotateQRToken(userId);
-      const backendToken = tokenResponse.qrToken;
+      let backendToken: string;
+      let isOfflineMode = false;
+
+      // Try to get backend token
+      try {
+        const tokenResponse = await rotateQRToken(userId);
+        backendToken = tokenResponse.qrToken;
+      } catch (err) {
+        // If backend is unavailable, check for offline vault
+        console.warn("Backend unavailable, checking for offline vault:", err);
+        const offlineVault = getOfflineVault();
+        
+        // Use offline vault if it exists and matches the user ID (even if items array is empty)
+        if (offlineVault && offlineVault.userId === userId) {
+          // Use a placeholder token for offline mode
+          // In a real implementation, this would be a cached token or a special offline token
+          backendToken = "OFFLINE_MODE";
+          isOfflineMode = true;
+          console.log(`Using offline mode for QR generation (${offlineVault.items.length} items in offline vault)`);
+          // Don't set as error - this is expected behavior in offline mode
+          // setError("Offline mode: Using cached vault data. QR may have limited functionality.");
+        } else {
+          throw new Error(
+            "Backend unavailable and no offline vault found. Please download offline vault when online."
+          );
+        }
+      }
+
       setQrToken(backendToken);
 
       // Generate local fragment
@@ -92,6 +118,7 @@ export default function QRGenerator() {
         fragment: localFragment,
         userId: userId,
         timestamp: Date.now(),
+        offline: isOfflineMode,
       };
 
       // Encode as JSON string for QR code
@@ -141,6 +168,7 @@ export default function QRGenerator() {
         
         {error && (
           <div className="alert alert-error mb-4">
+            <AlertTriangle className="w-5 h-5" />
             <span>{error}</span>
           </div>
         )}
