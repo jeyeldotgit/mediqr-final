@@ -10,6 +10,7 @@ import RecoveryOptions from "./pages/RecoveryOptions";
 import Guardians from "./pages/Guardians";
 import StaffLogin from "./pages/StaffLogin";
 import StaffScanner from "./pages/StaffScanner";
+import StaffEmergency from "./pages/StaffEmergency";
 import StaffPatientView from "./pages/StaffPatientView";
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
         <Route path="/settings/guardians" element={<Guardians />} />
         <Route path="/staff/login" element={<StaffLogin />} />
         <Route path="/staff/scanner" element={<StaffScanner />} />
+        <Route path="/staff/emergency" element={<StaffEmergency />} />
         <Route path="/staff/patient-view/:id" element={<StaffPatientView />} />
       </Routes>
     </CryptoProvider>

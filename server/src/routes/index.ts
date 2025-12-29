@@ -12,6 +12,7 @@ import {
   deleteRecoveryShard,
 } from "../controllers/recoveryController";
 import { searchUsers } from "../controllers/guardianController";
+import { breakGlass } from "../controllers/emergencyController";
 
 const router = Router();
 
@@ -45,5 +46,8 @@ router.post("/social/shard", storeGuardianShard);
 
 // Guardian endpoints
 router.post("/guardians/search", searchUsers);
+
+// Emergency endpoints (requires er_admin role)
+router.post("/emergency/break-glass", breakGlass);
 
 export default router;

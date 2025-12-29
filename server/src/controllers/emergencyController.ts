@@ -1,21 +1,21 @@
 import { Request, Response } from "express";
 import { supabase } from "../config/supabase";
-import { recordAccessSchema, RecordAccessRequest } from "../schemas/qr";
-import { verifyQRToken, verifyStaffToken } from "../lib/jwt";
+import { verifyStaffToken } from "../lib/jwt";
 import { logAccess } from "../middleware/auditLog";
+import { breakGlassSchema } from "../schemas/emergency";
 
 /**
- * POST /api/record/access
- * Validate staff JWT + patient QR token, then return storage references for encrypted blobs
+ * POST /api/emergency/break-glass
+ * Emergency break-glass access for ER Admins
  * 
  * This endpoint:
  * 1. Verifies staff JWT token
- * 2. Verifies patient QR token
- * 3. Looks up medical_blobs for the patient
- * 4. Returns storage paths and signed URLs for authorized access
- * 5. Logs the access in access_logs
+ * 2. Checks that staff has er_admin role
+ * 3. Validates patient ID and justification
+ * 4. Returns medical blobs with signed URLs
+ * 5. Logs BREAK_GLASS access with justification
  */
-export async function recordAccess(req: Request, res: Response) {
+export async function breakGlass(req: Request, res: Response) {
   try {
     // Get staff token from Authorization header
     const authHeader = req.headers.authorization;
@@ -39,8 +39,16 @@ export async function recordAccess(req: Request, res: Response) {
       });
     }
 
+    // Check that staff has er_admin role
+    if (staffPayload.role !== "er_admin") {
+      return res.status(403).json({
+        error: "Forbidden",
+        details: "Break-glass access requires er_admin role",
+      });
+    }
+
     // Validate request body
-    const validationResult = recordAccessSchema.safeParse(req.body);
+    const validationResult = breakGlassSchema.safeParse(req.body);
     if (!validationResult.success) {
       return res.status(400).json({
         error: "Validation failed",
@@ -48,26 +56,7 @@ export async function recordAccess(req: Request, res: Response) {
       });
     }
 
-    const { qrToken, patientId }: RecordAccessRequest = validationResult.data;
-
-    // Verify QR token
-    let qrPayload;
-    try {
-      qrPayload = verifyQRToken(qrToken);
-    } catch (error) {
-      return res.status(401).json({
-        error: "Invalid QR token",
-        details: error instanceof Error ? error.message : "QR token verification failed",
-      });
-    }
-
-    // Verify patient ID matches QR token
-    if (qrPayload.userId !== patientId) {
-      return res.status(403).json({
-        error: "Token mismatch",
-        details: "QR token does not match patient ID",
-      });
-    }
+    const { patientId, justification } = validationResult.data;
 
     // Verify patient exists
     const { data: patientProfile, error: patientError } = await supabase
@@ -137,11 +126,12 @@ export async function recordAccess(req: Request, res: Response) {
       })
     );
 
-    // Log access in access_logs using audit middleware
+    // Log BREAK_GLASS access with justification
     await logAccess({
       staffId: staffPayload.staffId,
       patientId: patientId,
-      method: "QR_SCAN",
+      method: "BREAK_GLASS",
+      justification: justification,
     });
 
     res.json({
@@ -151,10 +141,12 @@ export async function recordAccess(req: Request, res: Response) {
       staffRole: staffPayload.role,
       blobs: blobAccess,
       count: blobAccess.length,
-      message: "Access granted",
+      method: "BREAK_GLASS",
+      justification: justification,
+      message: "Emergency access granted",
     });
   } catch (error) {
-    console.error("Unexpected error in recordAccess:", error);
+    console.error("Unexpected error in breakGlass:", error);
     res.status(500).json({
       error: "Internal server error",
       details: error instanceof Error ? error.message : "Unknown error",

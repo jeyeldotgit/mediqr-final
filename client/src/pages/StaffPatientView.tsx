@@ -16,6 +16,8 @@ interface PatientData {
     error?: string;
   }>;
   fragment: string;
+  accessMethod?: "QR_SCAN" | "BREAK_GLASS";
+  justification?: string;
 }
 
 interface DecryptedRecord {
@@ -157,10 +159,17 @@ export default function StaffPatientView() {
               <p className="text-neutral/70">Patient ID: {id}</p>
             </div>
           </div>
-          <div className="badge badge-success badge-lg">
-            <CheckCircle className="w-4 h-4 mr-1" />
-            QR Access
-          </div>
+          {patientData?.accessMethod === "BREAK_GLASS" ? (
+            <div className="badge badge-error badge-lg">
+              <AlertCircle className="w-4 h-4 mr-1" />
+              Break-Glass Access
+            </div>
+          ) : (
+            <div className="badge badge-success badge-lg">
+              <CheckCircle className="w-4 h-4 mr-1" />
+              QR Access
+            </div>
+          )}
         </div>
 
         {/* Error Message */}
@@ -183,13 +192,23 @@ export default function StaffPatientView() {
                 </div>
                 <div>
                   <p className="text-sm text-neutral/70">Access Method</p>
-                  <p className="text-lg font-semibold text-secondary">QR Scan</p>
+                  <p className={`text-lg font-semibold ${
+                    patientData.accessMethod === "BREAK_GLASS" ? "text-error" : "text-secondary"
+                  }`}>
+                    {patientData.accessMethod === "BREAK_GLASS" ? "Break-Glass" : "QR Scan"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-neutral/70">Access Time</p>
                   <p className="text-lg font-semibold">{new Date().toLocaleString()}</p>
                 </div>
               </div>
+              {patientData.accessMethod === "BREAK_GLASS" && patientData.justification && (
+                <div className="mt-4 pt-4 border-t border-base-300">
+                  <p className="text-sm text-neutral/70 mb-2">Justification:</p>
+                  <p className="text-sm bg-base-100 p-3 rounded">{patientData.justification}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

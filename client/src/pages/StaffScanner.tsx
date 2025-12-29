@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { recordAccess } from "../services/staffService";
-import { QrCode, Camera, AlertCircle, CheckCircle, ArrowRight } from "lucide-react";
+import { QrCode, Camera, AlertCircle, CheckCircle, ArrowRight, Shield } from "lucide-react";
 
 export default function StaffScanner() {
   const navigate = useNavigate();
@@ -87,6 +87,7 @@ export default function StaffScanner() {
         patientId: userId,
         blobs: response.blobs,
         fragment: fragment, // Store fragment for decryption
+        accessMethod: "QR_SCAN",
       }));
 
       navigate(`/staff/patient-view/${userId}`);
@@ -122,17 +123,28 @@ export default function StaffScanner() {
               Role: <span className="font-semibold capitalize">{staffRole}</span>
             </p>
           </div>
-          <button
-            className="btn btn-ghost"
-            onClick={() => {
-              localStorage.removeItem("mediqr_staff_token");
-              localStorage.removeItem("mediqr_staff_id");
-              localStorage.removeItem("mediqr_staff_role");
-              navigate("/staff/login");
-            }}
-          >
-            Logout
-          </button>
+          <div className="flex gap-2">
+            {staffRole === "er_admin" && (
+              <button
+                className="btn btn-error"
+                onClick={() => navigate("/staff/emergency")}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Emergency Access
+              </button>
+            )}
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                localStorage.removeItem("mediqr_staff_token");
+                localStorage.removeItem("mediqr_staff_id");
+                localStorage.removeItem("mediqr_staff_role");
+                navigate("/staff/login");
+              }}
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* Error Message */}

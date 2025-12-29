@@ -74,10 +74,35 @@ export function getUserId(): string | null {
 }
 
 /**
+ * Get staff token from localStorage
+ */
+export function getStaffToken(): string | null {
+  return localStorage.getItem("mediqr_staff_token");
+}
+
+/**
+ * Get staff role from localStorage
+ */
+export function getStaffRole(): string | null {
+  return localStorage.getItem("mediqr_staff_role");
+}
+
+/**
+ * Get staff ID from localStorage
+ */
+export function getStaffId(): string | null {
+  return localStorage.getItem("mediqr_staff_id");
+}
+
+/**
  * Clear all stored data
  */
 export function clearAllStorage(): void {
   Object.values(STORAGE_KEYS).forEach((key) => {
     localStorage.removeItem(key);
   });
+  // Also clear staff tokens
+  localStorage.removeItem("mediqr_staff_token");
+  localStorage.removeItem("mediqr_staff_role");
+  localStorage.removeItem("mediqr_staff_id");
 }
