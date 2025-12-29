@@ -1,13 +1,22 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { deriveMEKFromMnemonic } from "../lib/crypto/keyDerivation";
-import { encryptData, decryptData, encryptDataToBase64, decryptDataFromBase64 } from "../lib/crypto/aes";
+import { encryptDataToBase64, decryptDataFromBase64 } from "../lib/crypto/aes";
 
 interface CryptoContextType {
   masterKey: CryptoKey | null;
   isUnlocked: boolean;
   unlock: (mnemonic: string) => Promise<void>;
+  unlockWithKey: (key: CryptoKey) => Promise<void>;
   lock: () => void;
-  encryptData: (plaintext: string) => Promise<{ encrypted: string; iv: string }>;
+  encryptData: (
+    plaintext: string
+  ) => Promise<{ encrypted: string; iv: string }>;
   decryptData: (encrypted: string, iv: string) => Promise<string>;
 }
 
@@ -23,8 +32,24 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
       setMasterKey(key);
       setIsUnlocked(true);
     } catch (error) {
-      console.error("Failed to unlock:", error);
-      throw new Error("Failed to derive master key from mnemonic");
+      throw new Error(
+        `Failed to unlock: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+  }, []);
+
+  const unlockWithKey = useCallback(async (key: CryptoKey) => {
+    try {
+      setMasterKey(key);
+      setIsUnlocked(true);
+    } catch (error) {
+      throw new Error(
+        `Failed to unlock with key: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }, []);
 
@@ -33,20 +58,20 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
     setIsUnlocked(false);
   }, []);
 
-  const encrypt = useCallback(
+  const encryptData = useCallback(
     async (plaintext: string): Promise<{ encrypted: string; iv: string }> => {
       if (!masterKey) {
-        throw new Error("Master key not unlocked");
+        throw new Error("Master key not available. Please unlock first.");
       }
       return encryptDataToBase64(masterKey, plaintext);
     },
     [masterKey]
   );
 
-  const decrypt = useCallback(
+  const decryptData = useCallback(
     async (encrypted: string, iv: string): Promise<string> => {
       if (!masterKey) {
-        throw new Error("Master key not unlocked");
+        throw new Error("Master key not available. Please unlock first.");
       }
       return decryptDataFromBase64(masterKey, encrypted, iv);
     },
@@ -59,9 +84,10 @@ export function CryptoProvider({ children }: { children: ReactNode }) {
         masterKey,
         isUnlocked,
         unlock,
+        unlockWithKey,
         lock,
-        encryptData: encrypt,
-        decryptData: decrypt,
+        encryptData,
+        decryptData,
       }}
     >
       {children}
@@ -76,4 +102,3 @@ export function useCrypto() {
   }
   return context;
 }
-

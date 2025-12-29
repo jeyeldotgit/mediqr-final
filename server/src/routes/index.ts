@@ -4,6 +4,14 @@ import { syncVault, getVaultItems } from "../controllers/vaultController";
 import { rotateQRToken } from "../controllers/qrController";
 import { staffAuth } from "../controllers/staffController";
 import { recordAccess } from "../controllers/recordController";
+import {
+  createRecoveryShards,
+  storeGuardianShard,
+  getRecoveryShards,
+  getShardById,
+  deleteRecoveryShard,
+} from "../controllers/recoveryController";
+import { searchUsers } from "../controllers/guardianController";
 
 const router = Router();
 
@@ -27,5 +35,15 @@ router.post("/staff/auth", staffAuth);
 
 // Record access endpoints (requires staff authentication)
 router.post("/record/access", recordAccess);
+
+// Recovery & Social Recovery endpoints
+router.post("/recovery/shards", createRecoveryShards);
+router.get("/recovery/shards", getRecoveryShards);
+router.get("/recovery/shards/:shardId", getShardById);
+router.delete("/recovery/shards/:shardId", deleteRecoveryShard);
+router.post("/social/shard", storeGuardianShard);
+
+// Guardian endpoints
+router.post("/guardians/search", searchUsers);
 
 export default router;

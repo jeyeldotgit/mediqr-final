@@ -49,8 +49,10 @@
 #### 3.2 Login / Restore Model
 
 - **Login = Restore**:
-  - On a new device, “logging in” is actually **restoring**: user re-enters the 12‑word phrase or reconstructs the MEK via social recovery.
+  - On a new device or after page refresh, "logging in" is actually **restoring**: user re-enters the 12‑word phrase or reconstructs the MEK via social recovery.
   - Once derived, the MEK unlocks the local vault and can decrypt any blobs fetched from the backend.
+  - **Implementation**: `/restore` page allows existing users to enter their mnemonic phrase to restore access.
+  - Master key is never persisted - only exists in memory during active session.
 
 #### 3.3 Social Recovery (2‑of‑3 Shamir Sharding)
 
@@ -305,6 +307,16 @@
 4. App derives MEK and (optionally) creates SSS shards.
 5. Local shard saved; guardian shards configured and sent; backup shard stored via API.
 6. User lands on `/dashboard`.
+
+#### 8.1a Citizen Restore/Login
+
+1. Existing user opens PWA (after page refresh or on new device).
+2. App detects user is onboarded but vault is locked.
+3. User redirected to `/restore` page.
+4. User enters their 12‑word mnemonic phrase.
+5. App validates mnemonic and derives MEK.
+6. Crypto context unlocked with MEK.
+7. User redirected to `/dashboard` with full access.
 
 #### 8.2 Vault Update
 

@@ -34,7 +34,13 @@
 - **Onboarding Flow**
 
   - Implement `/onboarding` UI (steps to display and verify 12 words).
-  - Persist minimal local state (e.g. local shard, “onboarded” flag).
+  - Persist minimal local state (e.g. local shard, "onboarded" flag).
+
+- **Restore/Login Flow**
+
+  - Implement `/restore` page for existing users to enter mnemonic phrase.
+  - Validate mnemonic and unlock crypto context.
+  - Redirect to dashboard on successful restore.
 
 - **Basic Profile Wiring**
   - Implement `/auth/init` endpoint to store user public key and hashed identifier.

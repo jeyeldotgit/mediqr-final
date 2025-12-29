@@ -84,10 +84,7 @@ export default function Dashboard() {
               Welcome to your MediQR health vault
             </p>
           </div>
-          <button
-            className="btn btn-ghost"
-            onClick={() => navigate("/")}
-          >
+          <button className="btn btn-ghost" onClick={() => navigate("/")}>
             Home
           </button>
         </div>
@@ -118,13 +115,11 @@ export default function Dashboard() {
                 <div>
                   <p className="text-sm text-neutral/70 mb-1">Last Updated</p>
                   <p className="text-lg font-semibold text-secondary">
-                    {loading ? (
-                      "..."
-                    ) : lastUpdated ? (
-                      lastUpdated.toLocaleDateString()
-                    ) : (
-                      "Never"
-                    )}
+                    {loading
+                      ? "..."
+                      : lastUpdated
+                      ? lastUpdated.toLocaleDateString()
+                      : "Never"}
                   </p>
                 </div>
                 <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center">
@@ -154,7 +149,9 @@ export default function Dashboard() {
         {totalItems > 0 && (
           <div className="card bg-base-200 shadow-xl mb-6">
             <div className="card-body">
-              <h2 className="card-title text-primary mb-4">Records by Category</h2>
+              <h2 className="card-title text-primary mb-4">
+                Records by Category
+              </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {["identity", "allergies", "medications", "records"].map(
                   (category) => {
@@ -223,7 +220,9 @@ export default function Dashboard() {
                   className="btn btn-secondary w-full"
                   onClick={() => {
                     // Scroll to QR generator section
-                    const qrSection = document.getElementById("qr-generator-section");
+                    const qrSection = document.getElementById(
+                      "qr-generator-section"
+                    );
                     if (qrSection) {
                       qrSection.scrollIntoView({ behavior: "smooth" });
                     }
@@ -251,10 +250,7 @@ export default function Dashboard() {
               <div className="card-actions">
                 <button
                   className="btn btn-accent w-full"
-                  onClick={() => {
-                    // Placeholder for settings
-                    alert("Settings page coming soon!");
-                  }}
+                  onClick={() => navigate("/settings")}
                 >
                   Settings
                   <Settings className="w-4 h-4 ml-2" />

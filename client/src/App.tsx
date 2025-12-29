@@ -5,6 +5,9 @@ import Onboarding from "./pages/Onboarding";
 import Restore from "./pages/Restore";
 import Dashboard from "./pages/Dashboard";
 import Vault from "./pages/Vault";
+import Settings from "./pages/Settings";
+import RecoveryOptions from "./pages/RecoveryOptions";
+import Guardians from "./pages/Guardians";
 import StaffLogin from "./pages/StaffLogin";
 import StaffScanner from "./pages/StaffScanner";
 import StaffPatientView from "./pages/StaffPatientView";
@@ -18,6 +21,9 @@ function App() {
         <Route path="/restore" element={<Restore />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/vault" element={<Vault />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/recovery" element={<RecoveryOptions />} />
+        <Route path="/settings/guardians" element={<Guardians />} />
         <Route path="/staff/login" element={<StaffLogin />} />
         <Route path="/staff/scanner" element={<StaffScanner />} />
         <Route path="/staff/patient-view/:id" element={<StaffPatientView />} />
