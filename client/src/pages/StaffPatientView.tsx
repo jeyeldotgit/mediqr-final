@@ -23,6 +23,15 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+function formatLabel(field: string): string {
+  return field
+    .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
 interface PatientData {
   patientId: string;
   blobs: Array<{
@@ -382,9 +391,48 @@ export default function StaffPatientView() {
                   </div>
 
                   <div className="bg-base-100 p-4 rounded-lg">
-                    <pre className="text-sm whitespace-pre-wrap">
-                      {JSON.stringify(record.data, null, 2)}
-                    </pre>
+                    {record.data && typeof record.data === "object" ? (
+                      "error" in record.data ? (
+                        <div className="alert alert-error">
+                          <AlertCircle className="w-4 h-4" />
+                          <div>
+                            <p className="font-semibold text-sm">
+                              {(record.data as any).error}
+                            </p>
+                            {(record.data as any).message && (
+                              <p className="text-xs mt-1">
+                                {(record.data as any).message}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <dl className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {Object.entries(
+                            record.data as Record<string, any>
+                          ).map(([key, value]) => (
+                            <div key={key}>
+                              <dt className="text-xs font-semibold text-neutral/60">
+                                {formatLabel(key)}
+                              </dt>
+                              <dd className="mt-1 text-sm">
+                                {value && typeof value === "object" ? (
+                                  <pre className="whitespace-pre-wrap text-xs">
+                                    {JSON.stringify(value, null, 2)}
+                                  </pre>
+                                ) : (
+                                  String(value ?? "")
+                                )}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      )
+                    ) : (
+                      <pre className="text-sm whitespace-pre-wrap">
+                        {String(record.data ?? "")}
+                      </pre>
+                    )}
                   </div>
                 </div>
               </div>

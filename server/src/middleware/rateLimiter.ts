@@ -30,7 +30,7 @@ interface RateLimitOptions {
 
 /**
  * Rate limiting middleware
- * 
+ *
  * @param options - Rate limit configuration
  * @returns Express middleware function
  */
@@ -76,7 +76,10 @@ export function rateLimiter(options: RateLimitOptions) {
 
     // Add rate limit headers
     res.setHeader("X-RateLimit-Limit", maxRequests.toString());
-    res.setHeader("X-RateLimit-Remaining", Math.max(0, maxRequests - entry.count).toString());
+    res.setHeader(
+      "X-RateLimit-Remaining",
+      Math.max(0, maxRequests - entry.count).toString()
+    );
     res.setHeader("X-RateLimit-Reset", new Date(entry.resetTime).toISOString());
 
     // Track response status for skip options
@@ -87,7 +90,10 @@ export function rateLimiter(options: RateLimitOptions) {
       const isFailure = statusCode >= 400;
 
       // Decrement if we should skip this request
-      if ((skipSuccessfulRequests && isSuccess) || (skipFailedRequests && isFailure)) {
+      if (
+        (skipSuccessfulRequests && isSuccess) ||
+        (skipFailedRequests && isFailure)
+      ) {
         entry.count = Math.max(0, entry.count - 1);
       }
 
@@ -130,9 +136,10 @@ export const rateLimiters = {
   }),
 
   // Strict rate limit for vault operations
+  // vault limiter
   vault: rateLimiter({
-    windowMs: 60 * 1000, // 1 minute
-    maxRequests: 20, // 20 requests per minute
+    windowMs: 60 * 1000,
+    maxRequests: 200, // much higher for dev
   }),
 
   // Very strict rate limit for emergency break-glass
@@ -154,4 +161,3 @@ export const rateLimiters = {
     },
   }),
 };
-
