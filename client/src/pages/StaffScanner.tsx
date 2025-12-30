@@ -1,37 +1,31 @@
+/**
+ * Staff Scanner Page
+ * Converted to arrow syntax
+ */
+
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { recordAccess } from "../services/staffService";
-import {
-  QrCode,
-  Camera,
-  AlertCircle,
-  CheckCircle,
-  ArrowRight,
-  Shield,
-} from "lucide-react";
+import { QrCode, Camera, AlertCircle, Shield } from "lucide-react";
 
-export default function StaffScanner() {
+const StaffScanner = () => {
   const navigate = useNavigate();
   const [scanning, setScanning] = useState(false);
-  const [scannedData, setScannedData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Get staff token from localStorage
   const staffToken = localStorage.getItem("mediqr_staff_token");
   const staffRole = localStorage.getItem("mediqr_staff_role");
 
   useEffect(() => {
-    // Check if staff is authenticated
     if (!staffToken) {
       navigate("/staff/login");
       return;
     }
 
     return () => {
-      // Cleanup: stop camera stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -41,17 +35,15 @@ export default function StaffScanner() {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }, // Use back camera on mobile
+        video: { facingMode: "environment" },
       });
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
         setScanning(true);
         setError(null);
       }
-    } catch (err) {
-      console.error("Camera error:", err);
+    } catch {
       setError("Failed to access camera. Please grant camera permissions.");
     }
   };
@@ -61,15 +53,12 @@ export default function StaffScanner() {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    if (videoRef.current) videoRef.current.srcObject = null;
     setScanning(false);
   };
 
   const handleQRScan = async (qrData: string) => {
     try {
-      // Parse QR payload
       const payload = JSON.parse(qrData);
       const { token, fragment, userId } = payload;
 
@@ -80,47 +69,42 @@ export default function StaffScanner() {
       setLoading(true);
       setError(null);
 
-      // Call record access endpoint
       const response = await recordAccess(
-        {
-          qrToken: token,
-          patientId: userId,
-        },
+        { qrToken: token, patientId: userId },
         staffToken!
       );
 
-      // Store patient data and navigate to patient view
       localStorage.setItem(
         "mediqr_patient_data",
         JSON.stringify({
           patientId: userId,
           blobs: response.blobs,
-          fragment: fragment, // Store fragment for decryption
-          token: token, // Store token for key derivation
+          fragment,
+          token,
           accessMethod: "QR_SCAN",
         })
       );
 
       navigate(`/staff/patient-view/${userId}`);
     } catch (err) {
-      console.error("QR scan error:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to process QR code"
-      );
+      setError(err instanceof Error ? err.message : "Failed to process QR code");
       setLoading(false);
     }
   };
 
   const handleManualInput = () => {
     const qrData = prompt("Enter QR code data:");
-    if (qrData) {
-      handleQRScan(qrData);
-    }
+    if (qrData) handleQRScan(qrData);
   };
 
-  if (!staffToken) {
-    return null; // Will redirect
-  }
+  const handleLogout = () => {
+    localStorage.removeItem("mediqr_staff_token");
+    localStorage.removeItem("mediqr_staff_id");
+    localStorage.removeItem("mediqr_staff_role");
+    navigate("/staff/login");
+  };
+
+  if (!staffToken) return null;
 
   return (
     <div className="min-h-screen bg-base-100 p-4">
@@ -133,8 +117,7 @@ export default function StaffScanner() {
               Scan patient MediQR code to access records
             </p>
             <p className="text-sm text-neutral/60 mt-1">
-              Role:{" "}
-              <span className="font-semibold capitalize">{staffRole}</span>
+              Role: <span className="font-semibold capitalize">{staffRole}</span>
             </p>
           </div>
           <div className="flex gap-2">
@@ -147,21 +130,12 @@ export default function StaffScanner() {
                 Emergency Access
               </button>
             )}
-            <button
-              className="btn btn-ghost"
-              onClick={() => {
-                localStorage.removeItem("mediqr_staff_token");
-                localStorage.removeItem("mediqr_staff_id");
-                localStorage.removeItem("mediqr_staff_role");
-                navigate("/staff/login");
-              }}
-            >
+            <button className="btn btn-ghost" onClick={handleLogout}>
               Logout
             </button>
           </div>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="alert alert-error mb-4">
             <AlertCircle className="w-5 h-5" />
@@ -179,7 +153,7 @@ export default function StaffScanner() {
 
             {loading && (
               <div className="flex items-center justify-center py-8">
-                <span className="loading loading-spinner loading-lg"></span>
+                <span className="loading loading-spinner loading-lg" />
                 <span className="ml-4">Processing QR code...</span>
               </div>
             )}
@@ -215,7 +189,7 @@ export default function StaffScanner() {
                     style={{ maxHeight: "400px" }}
                   />
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="border-2 border-secondary border-dashed w-64 h-64 rounded-lg"></div>
+                    <div className="border-2 border-secondary border-dashed w-64 h-64 rounded-lg" />
                   </div>
                 </div>
                 <div className="text-center">
@@ -233,9 +207,6 @@ export default function StaffScanner() {
                       QR Scanner Library Required
                     </p>
                     <p className="text-xs mt-1">
-                      Install: npm install html5-qrcode or react-qr-reader
-                    </p>
-                    <p className="text-xs mt-1">
                       For now, use "Manual Input" button to test
                     </p>
                   </div>
@@ -251,17 +222,15 @@ export default function StaffScanner() {
             <h3 className="font-semibold text-primary mb-2">How to Use</h3>
             <ol className="list-decimal list-inside space-y-2 text-sm text-neutral/80">
               <li>Click "Start Camera" to activate your device camera</li>
-              <li>
-                Position the patient's MediQR code within the scanning frame
-              </li>
+              <li>Position the patient's MediQR code within the scanning frame</li>
               <li>The QR code will be automatically scanned and processed</li>
-              <li>
-                You'll be redirected to view the patient's encrypted records
-              </li>
+              <li>You'll be redirected to view the patient's encrypted records</li>
             </ol>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default StaffScanner;

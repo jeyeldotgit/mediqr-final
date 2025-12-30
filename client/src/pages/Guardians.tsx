@@ -18,7 +18,7 @@ import {
   Loader,
   BookOpen,
 } from "lucide-react";
-import EducationModal, { useEducationModal } from "../components/EducationModal";
+import { EducationModal, useEducationModal } from "../components/shared";
 
 export default function Guardians() {
   const navigate = useNavigate();

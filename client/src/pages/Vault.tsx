@@ -1,219 +1,26 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useCrypto } from "../contexts/CryptoProvider";
-import {
-  syncVault,
-  getVaultItems,
-  type VaultCategory,
-  type VaultItem,
-} from "../services/vaultService";
-import { getUserId, isOnboarded } from "../lib/storage";
-import { deriveSessionKeyFromMaster } from "../lib/crypto/sessionKey";
-import { encryptDataToBase64 } from "../lib/crypto/aes";
-import {
-  User,
-  AlertTriangle,
-  Pill,
-  FileText,
-  Save,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+/**
+ * Vault Page
+ * Layout and composition only - logic extracted to hooks
+ */
 
-type Category = VaultCategory;
+import { AlertTriangle } from "lucide-react";
+import { useAuthGuard, useVault } from "../hooks";
+import { VaultCategoryForm } from "../components/vault";
+import { VAULT_CATEGORIES, type VaultCategory } from "../types";
 
-const CATEGORY_CONFIG: Record<
-  Category,
-  { label: string; icon: React.ReactNode; fields: string[] }
-> = {
-  identity: {
-    label: "Identity",
-    icon: <User className="w-5 h-5" />,
-    fields: ["fullName", "dateOfBirth", "bloodType", "emergencyContact"],
-  },
-  allergies: {
-    label: "Allergies",
-    icon: <AlertTriangle className="w-5 h-5" />,
-    fields: ["allergen", "severity", "reaction", "notes"],
-  },
-  medications: {
-    label: "Medications",
-    icon: <Pill className="w-5 h-5" />,
-    fields: ["medication", "dosage", "frequency", "prescribingDoctor"],
-  },
-  records: {
-    label: "Medical Records",
-    icon: <FileText className="w-5 h-5" />,
-    fields: ["condition", "diagnosisDate", "treatment", "notes"],
-  },
-};
-
-export default function Vault() {
-  const { isUnlocked, masterKey } = useCrypto();
-  const userId = getUserId();
-  const [activeCategory, setActiveCategory] = useState<Category | null>(null);
-  const [vaultItems, setVaultItems] = useState<VaultItem[]>([]);
-  const [saving, setSaving] = useState<Category | null>(null);
-  const [success, setSuccess] = useState<Category | null>(null);
-  const [error, setError] = useState<string>("");
-
-  // Form data state
-  const [formData, setFormData] = useState<
-    Record<Category, Record<string, string>>
-  >({
-    identity: {},
-    allergies: {},
-    medications: {},
-    records: {},
-  });
-
-  const navigate = useNavigate();
-
-  // Redirect if locked
-  useEffect(() => {
-    if (!isUnlocked) {
-      // If user is onboarded but locked, redirect to restore
-      // Otherwise, redirect to onboarding
-      if (isOnboarded()) {
-        navigate("/restore");
-      } else {
-        navigate("/onboarding");
-      }
-      return;
-    }
-  }, [isUnlocked, navigate]);
-
-  // Load vault items on mount
-  useEffect(() => {
-    if (userId && isUnlocked) {
-      loadVaultItems();
-    }
-  }, [userId, isUnlocked]);
-
-  const loadVaultItems = async () => {
-    if (!userId) return;
-
-    try {
-      const response = await getVaultItems(userId);
-      setVaultItems(response.items || []);
-      setError(""); // Clear any previous errors
-    } catch (err) {
-      console.error("Failed to load vault items:", err);
-      // getVaultItems already tries offline vault, so if it still fails,
-      // there's no offline vault available
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to load vault items";
-      setError(
-        `Unable to load vault items. ${errorMessage}. ${
-          navigator.onLine
-            ? "Please try again."
-            : "You're offline. Please download offline vault when online."
-        }`
-      );
-    }
-  };
-
-  const handleInputChange = (
-    category: Category,
-    field: string,
-    value: string
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [category]: {
-        ...prev[category],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleSubmit = async (category: Category) => {
-    if (!userId || !isUnlocked) {
-      setError("Please unlock your vault first");
-      return;
-    }
-
-    try {
-      setSaving(category);
-      setError("");
-      setSuccess(null);
-
-      // Get form data for this category
-      const data = formData[category];
-
-      // Convert to JSON string
-      const jsonData = JSON.stringify(data);
-
-      // Derive session key from master key
-      // We use a deterministic token based on the fragment to ensure
-      // both encryption and decryption use the same token
-      if (!masterKey) {
-        throw new Error("Master key not available");
-      }
-
-      // Generate the fragment (deterministic)
-      const fragmentPlaintext = new TextEncoder().encode(
-        `mediqr-fragment-${userId}`
-      );
-      const ivInput = new TextEncoder().encode(`mediqr-iv-${userId}`);
-      const ivHash = await crypto.subtle.digest("SHA-256", ivInput);
-      const fixedIV = new Uint8Array(ivHash.slice(0, 12));
-      const encryptedFragment = await crypto.subtle.encrypt(
-        {
-          name: "AES-GCM",
-          iv: fixedIV,
-          tagLength: 128,
-        },
-        masterKey,
-        fragmentPlaintext
-      );
-      const fragmentBytes = new Uint8Array(encryptedFragment.slice(0, 16));
-
-      // Derive a deterministic token from the fragment
-      // This ensures the same token is used for encryption and decryption
-      const tokenMaterial = await crypto.subtle.digest(
-        "SHA-256",
-        fragmentBytes
-      );
-      const tokenBytes = new Uint8Array(tokenMaterial.slice(0, 32));
-      const deterministicToken = Array.from(tokenBytes)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("");
-
-      console.log(
-        "Deriving session key from master key with deterministic token"
-      );
-      const sessionKey = await deriveSessionKeyFromMaster(
-        masterKey,
-        deterministicToken,
-        userId
-      );
-
-      // Encrypt the data with session key
-      const { encrypted, iv } = await encryptDataToBase64(sessionKey, jsonData);
-
-      // Sync to server
-      await syncVault(userId, category, encrypted, iv);
-
-      // Clear form and show success
-      setFormData((prev) => ({
-        ...prev,
-        [category]: {},
-      }));
-      setSuccess(category);
-
-      // Reload vault items
-      await loadVaultItems();
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      console.error("Failed to save vault item:", err);
-      setError(err instanceof Error ? err.message : "Failed to save data");
-    } finally {
-      setSaving(null);
-    }
-  };
+const Vault = () => {
+  const { isUnlocked } = useAuthGuard();
+  const {
+    vaultItems,
+    formData,
+    activeCategory,
+    saving,
+    success,
+    error,
+    setActiveCategory,
+    handleInputChange,
+    handleSubmit,
+  } = useVault();
 
   if (!isUnlocked) {
     return (
@@ -250,127 +57,40 @@ export default function Vault() {
           </div>
         )}
 
-        {/* Accordion for categories */}
+        {/* Category Forms */}
         <div className="space-y-4">
-          {(Object.keys(CATEGORY_CONFIG) as Category[]).map((category) => {
-            const config = CATEGORY_CONFIG[category];
-            const isOpen = activeCategory === category;
-            const isSaving = saving === category;
-            const isSuccess = success === category;
-            const categoryItems = vaultItems.filter(
-              (item) => item.category === category
-            );
+          {(Object.keys(VAULT_CATEGORIES) as VaultCategory[]).map(
+            (category) => {
+              const config = VAULT_CATEGORIES[category];
+              const categoryItems = vaultItems.filter(
+                (item) => item.category === category
+              );
 
-            return (
-              <div
-                key={category}
-                className="collapse collapse-arrow bg-base-200 shadow-lg"
-              >
-                <input
-                  type="checkbox"
-                  checked={isOpen}
-                  onChange={(e) =>
-                    setActiveCategory(e.target.checked ? category : null)
+              return (
+                <VaultCategoryForm
+                  key={category}
+                  category={category}
+                  config={config}
+                  isOpen={activeCategory === category}
+                  isSaving={saving === category}
+                  isSuccess={success === category}
+                  categoryItems={categoryItems}
+                  formData={formData[category]}
+                  onToggle={(open) =>
+                    setActiveCategory(open ? category : null)
                   }
+                  onInputChange={(field, value) =>
+                    handleInputChange(category, field, value)
+                  }
+                  onSubmit={() => handleSubmit(category)}
                 />
-                <div className="collapse-title text-xl font-medium flex items-center gap-3">
-                  <div className="text-primary">{config.icon}</div>
-                  <span>{config.label}</span>
-                  {categoryItems.length > 0 && (
-                    <span className="badge badge-primary badge-sm">
-                      {categoryItems.length}
-                    </span>
-                  )}
-                </div>
-                <div className="collapse-content">
-                  <div className="space-y-4 pt-4">
-                    {/* Existing items */}
-                    {categoryItems.length > 0 && (
-                      <div className="mb-4">
-                        <h3 className="text-sm font-semibold text-neutral/70 mb-2">
-                          Saved Items
-                        </h3>
-                        <div className="space-y-2">
-                          {categoryItems.map((item) => (
-                            <div
-                              key={item.id}
-                              className="flex items-center justify-between p-3 bg-base-100 rounded-lg border border-base-300"
-                            >
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {config.label} Record
-                                </p>
-                                <p className="text-xs text-neutral/60">
-                                  Updated:{" "}
-                                  {new Date(
-                                    item.updated_at
-                                  ).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <CheckCircle2 className="w-5 h-5 text-primary" />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Form */}
-                    <div className="space-y-3">
-                      {config.fields.map((field) => (
-                        <div key={field} className="form-control">
-                          <label className="label">
-                            <span className="label-text capitalize">
-                              {field.replace(/([A-Z])/g, " $1").trim()}
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            className="input input-bordered w-full"
-                            value={formData[category][field] || ""}
-                            onChange={(e) =>
-                              handleInputChange(category, field, e.target.value)
-                            }
-                            placeholder={`Enter ${field
-                              .replace(/([A-Z])/g, " $1")
-                              .toLowerCase()}`}
-                          />
-                        </div>
-                      ))}
-
-                      <div className="flex justify-end gap-2 pt-2">
-                        <button
-                          className="btn btn-primary"
-                          onClick={() => handleSubmit(category)}
-                          disabled={isSaving}
-                        >
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4" />
-                              Save
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      {isSuccess && (
-                        <div className="alert alert-success">
-                          <CheckCircle2 className="w-5 h-5" />
-                          <span>Data saved successfully!</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              );
+            }
+          )}
         </div>
       </div>
     </div>
   );
-}
+};
+
+export default Vault;

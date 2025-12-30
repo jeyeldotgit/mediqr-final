@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+/**
+ * Settings Page
+ * Converted to arrow syntax
+ */
+
 import { useNavigate } from "react-router-dom";
-import { useCrypto } from "../contexts/CryptoProvider";
-import { isOnboarded } from "../lib/storage";
+import { useAuthGuard } from "../hooks";
 import {
   Shield,
   Key,
@@ -11,24 +14,11 @@ import {
   Database,
 } from "lucide-react";
 
-export default function Settings() {
+const Settings = () => {
   const navigate = useNavigate();
-  const { isUnlocked } = useCrypto();
-  const onboarded = isOnboarded();
+  const { isUnlocked, onboarded } = useAuthGuard();
 
-  // Redirect if not onboarded or not unlocked
-  useEffect(() => {
-    if (!onboarded) {
-      navigate("/onboarding");
-    } else if (!isUnlocked) {
-      navigate("/restore");
-    }
-  }, [onboarded, isUnlocked, navigate]);
-
-  // Don't render if not ready
-  if (!onboarded || !isUnlocked) {
-    return null;
-  }
+  if (!onboarded || !isUnlocked) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/10 via-base-100 to-secondary/10 p-4">
@@ -125,13 +115,7 @@ export default function Settings() {
                 client-side.
               </p>
               <div className="card-actions">
-                <button
-                  className="btn btn-accent w-full"
-                  onClick={() => {
-                    alert("Security settings coming soon!");
-                  }}
-                  disabled
-                >
+                <button className="btn btn-accent w-full" disabled>
                   Security Settings
                   <Lock className="w-4 h-4 ml-2" />
                 </button>
@@ -176,8 +160,7 @@ export default function Settings() {
                 </h3>
                 <p className="text-sm text-neutral/80">
                   Your master encryption key is never stored on our servers. All
-                  data is encrypted client-side before transmission. Only you
-                  have access to your decryption keys.
+                  data is encrypted client-side before transmission.
                 </p>
               </div>
             </div>
@@ -186,4 +169,6 @@ export default function Settings() {
       </div>
     </div>
   );
-}
+};
+
+export default Settings;

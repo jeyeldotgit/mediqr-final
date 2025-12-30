@@ -1,5 +1,10 @@
+/**
+ * Education Modal Component
+ * Shared modal for educational content across pages
+ */
+
 import { useState } from "react";
-import { X, BookOpen, Shield, QrCode, Users } from "lucide-react";
+import { X, Shield, QrCode, Users } from "lucide-react";
 
 type EducationTopic = "mnemonic" | "guardians" | "qr-consent";
 
@@ -102,11 +107,11 @@ const educationContent: Record<
   },
 };
 
-export default function EducationModal({
+export const EducationModal = ({
   topic,
   isOpen,
   onClose,
-}: EducationModalProps) {
+}: EducationModalProps) => {
   if (!isOpen) return null;
 
   const content = educationContent[topic];
@@ -128,7 +133,7 @@ export default function EducationModal({
           </button>
         </div>
 
-        <div className="divider"></div>
+        <div className="divider" />
 
         <div className="space-y-6">
           {content.sections.map((section, index) => (
@@ -149,15 +154,17 @@ export default function EducationModal({
           </button>
         </div>
       </div>
-      <div className="modal-backdrop" onClick={onClose}></div>
+      <div className="modal-backdrop" onClick={onClose} />
     </div>
   );
-}
+};
+
+export default EducationModal;
 
 /**
  * Hook to manage education modal state
  */
-export function useEducationModal() {
+export const useEducationModal = () => {
   const [topic, setTopic] = useState<EducationTopic | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -168,7 +175,6 @@ export function useEducationModal() {
 
   const closeModal = () => {
     setIsOpen(false);
-    // Clear topic after animation
     setTimeout(() => setTopic(null), 200);
   };
 
@@ -178,4 +184,5 @@ export function useEducationModal() {
     openModal,
     closeModal,
   };
-}
+};
+

@@ -1,12 +1,17 @@
+/**
+ * Emergency Card Component
+ * Offline vault download and status for dashboard
+ */
+
 import { useState, useEffect } from "react";
-import { useCrypto } from "../contexts/CryptoProvider";
+import { useCrypto } from "../../contexts/CryptoProvider";
 import {
   downloadOfflineVault,
   getOfflineVault,
   hasRecentOfflineVault,
   clearOfflineVault,
   getOfflineVaultSize,
-} from "../services/offlineVaultService";
+} from "../../services/offlineVaultService";
 import {
   AlertTriangle,
   Download,
@@ -17,7 +22,7 @@ import {
   WifiOff,
 } from "lucide-react";
 
-export default function EmergencyCard() {
+export const EmergencyCard = () => {
   const { isUnlocked } = useCrypto();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +30,6 @@ export default function EmergencyCard() {
   const [offlineVault, setOfflineVault] = useState(getOfflineVault());
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Listen for online/offline events
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -53,11 +57,8 @@ export default function EmergencyCard() {
       const vaultData = await downloadOfflineVault();
       setOfflineVault(vaultData);
       setSuccess(true);
-
-      // Clear success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      console.error("Failed to download offline vault:", err);
       setError(
         err instanceof Error
           ? err.message
@@ -66,10 +67,6 @@ export default function EmergencyCard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleRefreshOfflineVault = async () => {
-    await handleDownloadOfflineVault();
   };
 
   const handleClearOfflineVault = () => {
@@ -87,9 +84,7 @@ export default function EmergencyCard() {
     setError(null);
   };
 
-  if (!isUnlocked) {
-    return null;
-  }
+  if (!isUnlocked) return null;
 
   const hasRecentVault = hasRecentOfflineVault();
   const vaultSize = offlineVault ? getOfflineVaultSize() : 0;
@@ -125,20 +120,16 @@ export default function EmergencyCard() {
           </div>
         </div>
 
-        {/* Info Alert */}
         <div className="alert alert-info mb-4">
           <AlertTriangle className="w-5 h-5" />
           <div>
             <p className="text-sm font-semibold">Offline Mode</p>
             <p className="text-xs mt-1">
-              Download your encrypted vault data to access it offline. Your QR
-              code will work even when the server is unavailable. Data is stored
-              locally and encrypted.
+              Download your encrypted vault data to access it offline.
             </p>
           </div>
         </div>
 
-        {/* Success Message */}
         {success && (
           <div className="alert alert-success mb-4">
             <CheckCircle className="w-5 h-5" />
@@ -146,7 +137,6 @@ export default function EmergencyCard() {
           </div>
         )}
 
-        {/* Error Message */}
         {error && (
           <div className="alert alert-error mb-4">
             <AlertTriangle className="w-5 h-5" />
@@ -154,7 +144,6 @@ export default function EmergencyCard() {
           </div>
         )}
 
-        {/* Offline Vault Status */}
         {offlineVault && (
           <div className="bg-base-100 p-4 rounded-lg mb-4">
             <div className="flex items-center justify-between mb-2">
@@ -178,7 +167,6 @@ export default function EmergencyCard() {
           </div>
         )}
 
-        {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-2">
           {!offlineVault ? (
             <button
@@ -202,7 +190,7 @@ export default function EmergencyCard() {
             <>
               <button
                 className="btn btn-warning flex-1"
-                onClick={handleRefreshOfflineVault}
+                onClick={handleDownloadOfflineVault}
                 disabled={loading || !isOnline}
               >
                 {loading ? (
@@ -228,7 +216,6 @@ export default function EmergencyCard() {
           )}
         </div>
 
-        {/* Offline Notice */}
         {!isOnline && (
           <div className="mt-4 alert alert-warning">
             <WifiOff className="w-5 h-5" />
@@ -236,8 +223,8 @@ export default function EmergencyCard() {
               <p className="text-sm font-semibold">You're Offline</p>
               <p className="text-xs mt-1">
                 {offlineVault
-                  ? "Your offline vault is available. QR codes will work with local data."
-                  : "No offline vault available. Please download when online."}
+                  ? "Your offline vault is available."
+                  : "No offline vault available."}
               </p>
             </div>
           </div>
@@ -245,4 +232,6 @@ export default function EmergencyCard() {
       </div>
     </div>
   );
-}
+};
+
+export default EmergencyCard;

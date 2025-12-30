@@ -1,15 +1,20 @@
+/**
+ * Staff Login Page
+ * Converted to arrow syntax
+ */
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { staffAuth } from "../services/staffService";
 import { Stethoscope, Lock, Mail, Key } from "lucide-react";
 
-export default function StaffLogin() {
+type StaffRole = "doctor" | "paramedic" | "er_admin";
+
+const StaffLogin = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"doctor" | "paramedic" | "er_admin">(
-    "doctor"
-  );
+  const [role, setRole] = useState<StaffRole>("doctor");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,16 +25,11 @@ export default function StaffLogin() {
 
     try {
       const response = await staffAuth({ email, password, role });
-
-      // Store staff token in localStorage
       localStorage.setItem("mediqr_staff_token", response.token);
       localStorage.setItem("mediqr_staff_id", response.staffId);
       localStorage.setItem("mediqr_staff_role", response.role);
-
-      // Redirect to scanner
       navigate("/staff/scanner");
     } catch (err) {
-      console.error("Staff auth error:", err);
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setLoading(false);
@@ -51,16 +51,13 @@ export default function StaffLogin() {
             <p className="text-neutral/70">Access patient records securely</p>
           </div>
 
-          {/* Error Message */}
           {error && (
             <div className="alert alert-error mb-4">
               <span>{error}</span>
             </div>
           )}
 
-          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Role Selection */}
             <div className="form-control">
               <label className="label">
                 <span className="label-text font-semibold">Role</span>
@@ -68,9 +65,7 @@ export default function StaffLogin() {
               <select
                 className="select select-bordered w-full"
                 value={role}
-                onChange={(e) =>
-                  setRole(e.target.value as "doctor" | "paramedic" | "er_admin")
-                }
+                onChange={(e) => setRole(e.target.value as StaffRole)}
                 required
               >
                 <option value="doctor">Doctor</option>
@@ -79,7 +74,6 @@ export default function StaffLogin() {
               </select>
             </div>
 
-            {/* Email */}
             <div className="form-control">
               <label className="label">
                 <span className="label-text font-semibold">Email</span>
@@ -91,7 +85,6 @@ export default function StaffLogin() {
                 <input
                   type="email"
                   className="input input-bordered w-full pl-10"
-                  style={{ paddingLeft: "2.5rem" }}
                   placeholder="your.email@hospital.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -100,7 +93,6 @@ export default function StaffLogin() {
               </div>
             </div>
 
-            {/* Password */}
             <div className="form-control">
               <label className="label">
                 <span className="label-text font-semibold">Password</span>
@@ -112,7 +104,6 @@ export default function StaffLogin() {
                 <input
                   type="password"
                   className="input input-bordered w-full pl-10"
-                  style={{ paddingLeft: "2.5rem" }}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -121,7 +112,6 @@ export default function StaffLogin() {
               </div>
             </div>
 
-            {/* Submit Button */}
             <div className="form-control mt-6">
               <button
                 type="submit"
@@ -130,7 +120,7 @@ export default function StaffLogin() {
               >
                 {loading ? (
                   <>
-                    <span className="loading loading-spinner"></span>
+                    <span className="loading loading-spinner" />
                     Authenticating...
                   </>
                 ) : (
@@ -143,18 +133,13 @@ export default function StaffLogin() {
             </div>
           </form>
 
-          {/* Info Notice */}
           <div className="mt-6 alert alert-info">
-            <div>
-              <p className="text-sm">
-                <strong>Phase 3 MVP:</strong> For testing, you can create a new
-                account by entering any email and password. In production, this
-                will integrate with professional registries.
-              </p>
-            </div>
+            <p className="text-sm">
+              <strong>Phase 3 MVP:</strong> For testing, you can create a new
+              account by entering any email and password.
+            </p>
           </div>
 
-          {/* Back to Home */}
           <div className="text-center mt-4">
             <button
               className="btn btn-ghost btn-sm"
@@ -167,4 +152,6 @@ export default function StaffLogin() {
       </div>
     </div>
   );
-}
+};
+
+export default StaffLogin;
