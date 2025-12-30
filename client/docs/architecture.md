@@ -17,8 +17,8 @@ All encryption and key management happens in the browser:
   - BIP-39 mnemonic generation
   - Master Encryption Key (MEK) derivation
   - AES-256-GCM encryption/decryption
-  - Key sharding (future: Shamir's Secret Sharing)
-  - QR code generation
+  - Shamir's Secret Sharing for social recovery
+  - QR code generation with session keys
 
 - ❌ **Client never:**
   - Sends plaintext PHI to server
@@ -45,8 +45,9 @@ The client ensures the server never sees plaintext data:
 - **Styling:** Tailwind CSS 4 + DaisyUI
 - **Icons:** Lucide React
 - **Routing:** React Router v7
+- **Validation:** Zod
 - **Crypto:** Web Crypto API + @scure/bip39
-- **State Management:** React Context API
+- **State Management:** React Context API + Custom Hooks
 
 ---
 
@@ -55,34 +56,191 @@ The client ensures the server never sees plaintext data:
 ```
 client/
 ├── src/
-│   ├── main.tsx              # Application entry point
-│   ├── App.tsx               # Root component with routing
-│   ├── index.css             # Global styles + DaisyUI theme
+│   ├── main.tsx                    # Application entry point
+│   ├── App.tsx                     # Root component with routing
+│   ├── index.css                   # Global styles + DaisyUI theme
+│   │
+│   ├── components/                 # UI Components (organized by page)
+│   │   ├── dashboard/              # Dashboard-specific components
+│   │   │   ├── ActionCards.tsx
+│   │   │   ├── DashboardStats.tsx
+│   │   │   ├── EmergencyCard.tsx
+│   │   │   ├── QRGenerator.tsx
+│   │   │   └── index.ts
+│   │   ├── landing/                # Landing page components
+│   │   │   ├── CTASection.tsx
+│   │   │   ├── FeaturesSection.tsx
+│   │   │   ├── Footer.tsx
+│   │   │   ├── HeroSection.tsx
+│   │   │   ├── HowItWorksSection.tsx
+│   │   │   ├── Navbar.tsx
+│   │   │   ├── SecuritySection.tsx
+│   │   │   └── index.ts
+│   │   ├── onboarding/             # Onboarding components
+│   │   │   ├── MnemonicDisplay.tsx
+│   │   │   ├── MnemonicVerify.tsx
+│   │   │   └── index.ts
+│   │   ├── staff-patient-view/     # Staff patient view components
+│   │   │   ├── AccessInfoCard.tsx
+│   │   │   ├── PatientRecordCard.tsx
+│   │   │   └── index.ts
+│   │   ├── vault/                  # Vault components
+│   │   │   ├── VaultCategoryForm.tsx
+│   │   │   └── index.ts
+│   │   ├── shared/                 # Shared/reusable components
+│   │   │   ├── EducationModal.tsx
+│   │   │   └── index.ts
+│   │   └── index.ts                # Barrel export
+│   │
 │   ├── contexts/
-│   │   └── CryptoProvider.tsx # Crypto state management
-│   ├── pages/
-│   │   ├── Landing.tsx       # Landing page
-│   │   ├── Onboarding.tsx    # Onboarding flow
-│   │   ├── Dashboard.tsx     # User dashboard
-│   │   └── Vault.tsx         # Vault management page
-│   ├── services/
-│   │   ├── apiClient.ts      # Base API client with shared config
-│   │   ├── authService.ts     # Authentication & profile services
-│   │   ├── vaultService.ts    # Vault operations
-│   │   └── README.md         # Services documentation
-│   ├── lib/
-│   │   ├── storage.ts        # Local storage utilities
-│   │   └── crypto/
-│   │       ├── mnemonic.ts   # BIP-39 mnemonic utilities
-│   │       ├── keyDerivation.ts # MEK derivation
-│   │       ├── aes.ts        # AES-256-GCM encryption
-│   │       └── identifier.ts # Public key & hash generation
-│   └── assets/               # Static assets
-├── public/                   # Public assets
+│   │   └── CryptoProvider.tsx      # Crypto state management
+│   │
+│   ├── hooks/                      # Custom React hooks
+│   │   ├── useAuthGuard.ts         # Authentication redirects
+│   │   ├── useDashboard.ts         # Dashboard data aggregation
+│   │   ├── useOnboarding.ts        # Onboarding flow management
+│   │   ├── usePatientData.ts       # Patient data loading/decryption
+│   │   ├── useQRGenerator.ts       # QR code generation
+│   │   ├── useVault.ts             # Vault CRUD operations
+│   │   └── index.ts                # Barrel export
+│   │
+│   ├── pages/                      # Page components (composition only)
+│   │   ├── Dashboard.tsx
+│   │   ├── Guardians.tsx
+│   │   ├── Landing.tsx
+│   │   ├── Onboarding.tsx
+│   │   ├── RecoveryOptions.tsx
+│   │   ├── Restore.tsx
+│   │   ├── Settings.tsx
+│   │   ├── StaffEmergency.tsx
+│   │   ├── StaffLogin.tsx
+│   │   ├── StaffPatientView.tsx
+│   │   ├── StaffScanner.tsx
+│   │   └── Vault.tsx
+│   │
+│   ├── schemas/                    # Zod validation schemas
+│   │   ├── onboarding.schema.ts    # Mnemonic validation
+│   │   ├── vault.schema.ts         # Vault form validation
+│   │   └── index.ts                # Barrel export
+│   │
+│   ├── services/                   # API services (pure logic)
+│   │   ├── apiClient.ts            # Base API client
+│   │   ├── authService.ts          # Authentication
+│   │   ├── emergencyService.ts     # Break-glass access
+│   │   ├── guardianService.ts      # Guardian management
+│   │   ├── offlineVaultService.ts  # Offline storage
+│   │   ├── qrService.ts            # QR token rotation
+│   │   ├── recoveryService.ts      # Social recovery
+│   │   ├── staffService.ts         # Staff operations
+│   │   ├── vaultService.ts         # Vault operations
+│   │   └── README.md
+│   │
+│   ├── types/                      # TypeScript type definitions
+│   │   ├── patient.types.ts        # Patient-related types
+│   │   ├── vault.types.ts          # Vault-related types
+│   │   └── index.ts                # Barrel export
+│   │
+│   ├── lib/                        # Utility libraries
+│   │   ├── storage.ts              # Local storage utilities
+│   │   └── crypto/                 # Cryptography utilities
+│   │       ├── aes.ts              # AES-256-GCM encryption
+│   │       ├── identifier.ts       # Public key & hash generation
+│   │       ├── keyDerivation.ts    # MEK derivation
+│   │       ├── mnemonic.ts         # BIP-39 utilities
+│   │       ├── qrKeyDerivation.ts  # QR session key derivation
+│   │       ├── sessionKey.ts       # Session key management
+│   │       ├── shamir.ts           # Shamir's Secret Sharing
+│   │       └── shardDistribution.ts
+│   │
+│   └── assets/                     # Static assets
+│
+├── docs/                           # Documentation
+│   ├── api.md                      # API documentation
+│   └── architecture.md             # This file
+│
+├── public/                         # Public assets
 ├── package.json
 ├── vite.config.ts
-├── tsconfig.json
-└── README.md
+└── tsconfig.json
+```
+
+---
+
+## Architecture Layers
+
+### Pages (Composition Layer)
+
+Pages handle **layout and composition only** - no business logic or API calls.
+
+```typescript
+// src/pages/Dashboard.tsx - ~100 lines
+const Dashboard = () => {
+  const { isUnlocked } = useCrypto();
+  const dashboardState = useDashboard();
+
+  // Composition only - delegates to components and hooks
+  return (
+    <div>
+      <DashboardStats {...dashboardState} />
+      <ActionCards />
+      <QRGenerator />
+    </div>
+  );
+};
+```
+
+### Hooks (Behavior Layer)
+
+Hooks encapsulate **state management, data fetching, and business logic**.
+
+```typescript
+// src/hooks/useVault.ts
+export const useVault = (): UseVaultReturn => {
+  const [vaultItems, setVaultItems] = useState<VaultItem[]>([]);
+
+  const handleSubmit = async (category: VaultCategory) => {
+    // Encryption logic, API calls, state updates
+  };
+
+  return { vaultItems, handleSubmit, ... };
+};
+```
+
+### Services (API Layer)
+
+Services handle **pure API communication** - no React, no state.
+
+```typescript
+// src/services/vaultService.ts
+export const syncVault = async (
+  ownerId: string,
+  category: VaultCategory,
+  encryptedData: string,
+  iv: string
+): Promise<SyncVaultResponse> => {
+  return apiRequest<SyncVaultResponse>("/vault/sync", { ... });
+};
+```
+
+### Components (UI Layer)
+
+Components handle **rendering** - receive props, display UI.
+
+```typescript
+// src/components/dashboard/DashboardStats.tsx
+interface DashboardStatsProps {
+  totalItems: number;
+  categoryCounts: Record<string, number>;
+  loading: boolean;
+}
+
+export const DashboardStats = ({
+  totalItems,
+  categoryCounts,
+  loading,
+}: DashboardStatsProps) => {
+  return <div>...</div>;
+};
 ```
 
 ---
@@ -157,23 +315,16 @@ function MyComponent() {
 }
 ```
 
-### Onboarding Page
+### Custom Hooks
 
-Multi-step wizard for new users:
-
-1. **Generate Step:** Display 12-word mnemonic
-2. **Verify Step:** User selects words in correct order
-3. **Complete Step:** Initialize profile and unlock crypto
-
-### Landing Page
-
-Marketing/landing page with:
-
-- Hero section
-- Features showcase
-- How it works
-- Security highlights
-- Call-to-action
+| Hook             | Purpose                                |
+| ---------------- | -------------------------------------- |
+| `useAuthGuard`   | Authentication state and redirects     |
+| `useDashboard`   | Dashboard data aggregation             |
+| `useOnboarding`  | Onboarding flow management             |
+| `usePatientData` | Patient data loading and decryption    |
+| `useQRGenerator` | QR code generation with token rotation |
+| `useVault`       | Vault CRUD operations and encryption   |
 
 ---
 
@@ -193,6 +344,18 @@ Master Encryption Key (MEK) - 256 bits
 AES-256-GCM Encryption Key
 ```
 
+### Session Key Derivation (for QR)
+
+```
+MEK + QR Token + User ID
+    ↓
+HKDF derivation
+    ↓
+Session Key (ephemeral)
+    ↓
+Used for vault encryption
+```
+
 ### Encryption Flow
 
 ```
@@ -207,18 +370,96 @@ Base64 Encode
 Send to Server
 ```
 
-### Decryption Flow
+### Social Recovery (Shamir's Secret Sharing)
 
 ```
-Encrypted Blob (from server)
+Master Key
     ↓
-Base64 Decode
+Split into N shards (threshold K)
     ↓
-Extract IV
+Encrypt each shard for guardian
     ↓
-AES-256-GCM Decrypt (using MEK)
+Store shards with guardians
     ↓
-Plaintext Data
+Recovery: Collect K shards → Reconstruct
+```
+
+---
+
+## Routing
+
+### Citizen Routes
+
+| Route                 | Page            | Description               |
+| --------------------- | --------------- | ------------------------- |
+| `/`                   | Landing         | Marketing/landing page    |
+| `/onboarding`         | Onboarding      | New user setup            |
+| `/restore`            | Restore         | Existing user login       |
+| `/dashboard`          | Dashboard       | User dashboard            |
+| `/vault`              | Vault           | Medical record management |
+| `/settings`           | Settings        | User settings             |
+| `/settings/recovery`  | RecoveryOptions | Recovery setup            |
+| `/settings/guardians` | Guardians       | Guardian management       |
+
+### Staff Routes
+
+| Route                     | Page             | Description          |
+| ------------------------- | ---------------- | -------------------- |
+| `/staff/login`            | StaffLogin       | Staff authentication |
+| `/staff/scanner`          | StaffScanner     | QR scanner           |
+| `/staff/emergency`        | StaffEmergency   | Break-glass access   |
+| `/staff/patient-view/:id` | StaffPatientView | Patient record view  |
+
+### Authentication Model
+
+- **New Users**: Not onboarded → `/onboarding` (generate mnemonic)
+- **Existing Users (Locked)**: Onboarded but vault locked → `/restore` (enter mnemonic)
+- **Existing Users (Unlocked)**: Onboarded and unlocked → `/dashboard` or `/vault`
+- **Staff**: Token-based auth stored in localStorage, expires after 8 hours
+
+---
+
+## Validation with Zod
+
+Schemas are the **single source of truth** for form validation.
+
+### Vault Schemas
+
+```typescript
+// src/schemas/vault.schema.ts
+import { z } from "zod";
+
+export const identitySchema = z.object({
+  fullName: z.string().min(1, "Full name is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  bloodType: z.string().optional(),
+  emergencyContact: z.string().optional(),
+});
+
+export const allergiesSchema = z.object({
+  allergen: z.string().min(1, "Allergen is required"),
+  severity: z.enum(["mild", "moderate", "severe"]).optional(),
+  reaction: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+// Type inference from schema
+export type IdentityFormData = z.infer<typeof identitySchema>;
+```
+
+### Onboarding Schema
+
+```typescript
+// src/schemas/onboarding.schema.ts
+export const mnemonicSchema = z.object({
+  phrase: z
+    .string()
+    .min(1, "Recovery phrase is required")
+    .refine(
+      (val) => val.split(" ").length === 12,
+      "Recovery phrase must be exactly 12 words"
+    ),
+});
 ```
 
 ---
@@ -230,8 +471,9 @@ Plaintext Data
 Minimal state persisted locally:
 
 - `mediqr_onboarded` - Boolean flag
-- `mediqr_mnemonic` - Mnemonic phrase (Phase 1 only - should be removed in production)
-- `mediqr_local_shard` - Local recovery shard (placeholder for Phase 1)
+- `mediqr_user_id` - User identifier
+- `mediqr_staff_token` - Staff JWT token
+- `mediqr_offline_vault` - Offline vault data (encrypted)
 
 **Storage Utilities:** `src/lib/storage.ts`
 
@@ -240,42 +482,6 @@ Minimal state persisted locally:
 - Master encryption key (never persisted)
 - Unlock status
 - Current user data
-
----
-
-## Routing
-
-### Routes
-
-- `/` - Landing page
-- `/onboarding` - Onboarding flow (new users)
-- `/restore` - Restore/login page (existing users)
-- `/dashboard` - User dashboard
-- `/vault` - Vault management page
-- `/staff/login` - Staff authentication
-- `/staff/scanner` - QR scanner for staff
-- `/staff/patient-view/:id` - Patient record view
-
-### Route Protection & Authentication Flow
-
-**Citizen Routes:**
-
-- **New Users**: Not onboarded → `/onboarding` (generate mnemonic)
-- **Existing Users (Locked)**: Onboarded but vault locked → `/restore` (enter mnemonic)
-- **Existing Users (Unlocked)**: Onboarded and unlocked → `/dashboard` or `/vault`
-
-**Authentication Model:**
-
-- Follows "Login = Restore" model from architecture
-- Master key never persisted - only in memory
-- Users must re-enter mnemonic after page refresh
-- All decryption happens client-side
-
-**Staff Routes:**
-
-- Staff token stored in localStorage
-- Protected routes check for staff token
-- Token expires after 8 hours
 
 ---
 
@@ -300,7 +506,6 @@ DaisyUI components with custom theme configured in `src/index.css` using CSS var
 - Mobile-first approach
 - Tailwind breakpoints: `sm`, `md`, `lg`, `xl`
 - Responsive grid layouts
-- Mobile-optimized onboarding flow
 
 ---
 
@@ -318,15 +523,53 @@ DaisyUI components with custom theme configured in `src/index.css` using CSS var
 - All PHI encrypted before storage
 - Local storage only contains non-sensitive metadata
 - No plaintext data in browser storage
+- Offline vault stores encrypted blobs only
 
 ### Best Practices
 
 - ✅ Use Web Crypto API (browser-native)
 - ✅ Generate random IVs for each encryption
-- ✅ Validate mnemonic phrases
+- ✅ Validate mnemonic phrases with Zod
 - ✅ Clear sensitive data from memory when done
 - ❌ Never log encryption keys
 - ❌ Never send keys to server
+
+---
+
+## Component Organization Rules
+
+### File Size
+
+- **Max 200 lines** per file
+- Single responsibility per component
+- Extract complex logic to hooks
+
+### Component Syntax
+
+```typescript
+// ✅ Arrow function components
+export const MyComponent = ({ prop }: Props) => {
+  return <div>{prop}</div>;
+};
+
+// ❌ Avoid React.FC and default function exports
+export default function MyComponent() { ... }
+```
+
+### Folder Structure
+
+Components organized by the page they belong to:
+
+```
+components/
+├── dashboard/       # Dashboard page components
+├── landing/         # Landing page components
+├── onboarding/      # Onboarding components
+├── staff-patient-view/  # Staff view components
+├── vault/           # Vault components
+├── shared/          # Reusable across pages
+└── index.ts         # Barrel export
+```
 
 ---
 
@@ -348,13 +591,11 @@ npm run build
 
 Creates production build in `dist/` directory.
 
-### Preview
+### Type Check
 
 ```bash
-npm run preview
+npx tsc --noEmit
 ```
-
-Preview production build locally.
 
 ---
 
@@ -370,131 +611,9 @@ VITE_API_URL=http://localhost:4000/api
 
 ### Production
 
-Set environment variables in your hosting platform:
-
 ```bash
 VITE_API_URL=https://api.mediqr.com/api
 ```
-
----
-
-## Future Enhancements
-
-### Phase 2+
-
-- [ ] Vault UI for managing medical records
-- [ ] QR code generation component
-- [ ] Social recovery guardian management
-- [ ] Offline mode with service worker
-- [ ] PWA installation
-- [ ] Shamir's Secret Sharing implementation
-- [ ] Restore/login flow for existing users
-- [ ] Settings page
-- [ ] Dark mode support
-
----
-
-## Performance Considerations
-
-### Code Splitting
-
-- Routes are code-split automatically by React Router
-- Crypto utilities loaded on demand
-
-### Bundle Size
-
-- Using modern ES modules
-- Tree-shaking enabled
-- Vite optimizes bundle automatically
-
-### Optimization Opportunities
-
-- Lazy load heavy crypto operations
-- Cache encrypted blobs locally
-- Implement virtual scrolling for large lists
-
----
-
-## Testing Strategy
-
-### Unit Tests (Future)
-
-- Crypto utilities
-- Storage utilities
-- API client
-
-### Integration Tests (Future)
-
-- Onboarding flow
-- Encryption/decryption flow
-- API integration
-
-### E2E Tests (Future)
-
-- Complete user journeys
-- Cross-browser testing
-
----
-
-## Browser Compatibility
-
-### Required Features
-
-- Web Crypto API
-- ES6+ JavaScript
-- Local Storage
-- Fetch API
-
-### Supported Browsers
-
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-
----
-
-## Services Architecture
-
-API communication is organized into service modules located in `src/services/`:
-
-### Service Modules
-
-- **`apiClient.ts`** - Base API client with shared configuration
-
-  - `apiRequest()` - Generic fetch wrapper with error handling
-  - `API_BASE_URL` - Centralized API endpoint configuration
-
-- **`authService.ts`** - Authentication and profile management
-
-  - `initProfile()` - Initialize user profile after onboarding
-
-- **`vaultService.ts`** - Vault operations
-  - `syncVault()` - Sync encrypted blob to server
-  - `getVaultItems()` - Retrieve vault metadata
-
-### Service Pattern
-
-All services follow a consistent pattern:
-
-```typescript
-import { apiRequest } from "./apiClient";
-
-export interface MyRequest {
-  /* ... */
-}
-export interface MyResponse {
-  /* ... */
-}
-
-export async function myServiceFunction(data: MyRequest): Promise<MyResponse> {
-  return apiRequest<MyResponse>("/endpoint", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-```
-
-See [Services README](../src/services/README.md) for more details.
 
 ---
 
@@ -504,5 +623,3 @@ See [Services README](../src/services/README.md) for more details.
 - [Services README](../src/services/README.md)
 - [Server Architecture](../../server/docs/architecture.md)
 - [Final Plan](../../docs/FinalPlan.md)
-- [Phase 1 Implementation](../../docs/Phase1-Implementation.md)
-- [Phase 2 Implementation](../../docs/Phase2-Implementation.md)
