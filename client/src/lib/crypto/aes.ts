@@ -13,19 +13,24 @@ export async function encryptData(
   plaintext: string | Uint8Array
 ): Promise<{ ciphertext: ArrayBuffer; iv: Uint8Array }> {
   // Convert plaintext to ArrayBuffer if it's a string
-  const plaintextBuffer =
+  const plaintextBytes =
     typeof plaintext === "string"
       ? new TextEncoder().encode(plaintext)
       : plaintext;
+  
+  // Create a fresh ArrayBuffer to satisfy TypeScript's BufferSource type
+  const plaintextBuffer = new Uint8Array(plaintextBytes).buffer;
 
   // Generate a random IV (12 bytes for GCM)
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ivArray = new Uint8Array(12);
+  crypto.getRandomValues(ivArray);
+  const iv = new Uint8Array(ivArray.buffer);
 
   // Encrypt the data
   const ciphertext = await crypto.subtle.encrypt(
     {
       name: "AES-GCM",
-      iv: iv,
+      iv: iv.buffer,
       tagLength: 128, // 128-bit authentication tag
     },
     masterKey,
@@ -56,15 +61,19 @@ export async function decryptData(
     // Always operate on a Uint8Array for compatibility with all Web Crypto implementations
     const data =
       ciphertext instanceof Uint8Array ? ciphertext : new Uint8Array(ciphertext);
+    
+    // Create fresh ArrayBuffer copies to satisfy TypeScript's BufferSource type
+    const ivBuffer = new Uint8Array(iv).buffer;
+    const dataBuffer = new Uint8Array(data).buffer;
 
     const plaintextBuffer = await crypto.subtle.decrypt(
       {
         name: "AES-GCM",
-        iv: iv,
+        iv: ivBuffer,
         tagLength: 128,
       },
       masterKey,
-      data
+      dataBuffer
     );
 
     return new TextDecoder().decode(plaintextBuffer);

@@ -11,10 +11,13 @@ export async function deriveMEKFromMnemonic(mnemonic: string): Promise<CryptoKey
   const seed = mnemonicToSeed(mnemonic);
   const saltBuffer = new TextEncoder().encode(SALT);
   
+  // Create a fresh ArrayBuffer to satisfy TypeScript's BufferSource type
+  const seedBuffer = new Uint8Array(seed).buffer;
+  
   // Import the seed as a key for PBKDF2
   const baseKey = await crypto.subtle.importKey(
     "raw",
-    seed,
+    seedBuffer,
     { name: "PBKDF2" },
     false,
     ["deriveKey"]

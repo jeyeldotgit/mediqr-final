@@ -130,7 +130,7 @@ describe("Shamir's Secret Sharing", () => {
     // Shares should be different (random polynomial coefficients)
     // Note: secrets.js might produce deterministic shares, so we check if they're different
     // If they're the same, that's also valid behavior
-    const allSame = shares1.every((s, i) => s === shares2[i]);
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
 
     // Both should reconstruct to the same key regardless
     const combined1 = await reconstructMEKFromShards([shares1[0], shares1[1]]);
