@@ -108,10 +108,11 @@ export function rateLimiter(options: RateLimitOptions) {
  * Pre-configured rate limiters for common use cases
  */
 export const rateLimiters = {
-  // Strict rate limit for authentication endpoints
+  // Rate limit for authentication endpoints
+  // More lenient in development, stricter in production
   auth: rateLimiter({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 5, // 5 attempts per 15 minutes
+    maxRequests: process.env.NODE_ENV === "production" ? 10 : 50, // 50 in dev, 10 in prod
     keyGenerator: (req) => {
       // Use email if available, otherwise IP
       const body = req.body as { email?: string };
