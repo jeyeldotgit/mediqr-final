@@ -1,10 +1,11 @@
 /**
  * Staff Scanner Page
- * Converted to arrow syntax
+ * Uses html5-qrcode for QR scanning
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Html5Qrcode } from "html5-qrcode";
 import { recordAccess } from "../services/staffService";
 import { QrCode, Camera, AlertCircle, Shield } from "lucide-react";
 
@@ -13,11 +14,24 @@ const StaffScanner = () => {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerContainerId = "qr-scanner-container";
 
   const staffToken = localStorage.getItem("mediqr_staff_token");
   const staffRole = localStorage.getItem("mediqr_staff_role");
+
+  const stopCamera = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch {
+        // Scanner might already be stopped
+      }
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  }, []);
 
   useEffect(() => {
     if (!staffToken) {
@@ -26,35 +40,44 @@ const StaffScanner = () => {
     }
 
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      stopCamera();
     };
-  }, [staffToken, navigate]);
+  }, [staffToken, navigate, stopCamera]);
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        setScanning(true);
-        setError(null);
-      }
-    } catch {
-      setError("Failed to access camera. Please grant camera permissions.");
-    }
-  };
+      setError(null);
+      
+      // Create scanner instance
+      const scanner = new Html5Qrcode(scannerContainerId);
+      scannerRef.current = scanner;
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1,
+        },
+        (decodedText) => {
+          // Success callback - QR code scanned
+          handleQRScan(decodedText);
+          stopCamera();
+        },
+        () => {
+          // Error callback - ignore scan errors (no QR found in frame)
+        }
+      );
+
+      setScanning(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      if (message.includes("Permission")) {
+        setError("Camera permission denied. Please allow camera access and try again.");
+      } else {
+        setError(`Failed to start camera: ${message}`);
+      }
     }
-    if (videoRef.current) videoRef.current.srcObject = null;
-    setScanning(false);
   };
 
   const handleQRScan = async (qrData: string) => {
@@ -178,41 +201,22 @@ const StaffScanner = () => {
               </div>
             )}
 
-            {scanning && !loading && (
-              <div className="space-y-4">
-                <div className="relative bg-black rounded-lg overflow-hidden">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    className="w-full h-auto"
-                    style={{ maxHeight: "400px" }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="border-2 border-secondary border-dashed w-64 h-64 rounded-lg" />
-                  </div>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-neutral/70 mb-4">
-                    Position QR code within the frame
-                  </p>
-                  <button className="btn btn-ghost" onClick={stopCamera}>
-                    Stop Camera
-                  </button>
-                </div>
-                <div className="alert alert-info">
-                  <AlertCircle className="w-5 h-5" />
-                  <div>
-                    <p className="text-sm font-semibold">
-                      QR Scanner Library Required
-                    </p>
-                    <p className="text-xs mt-1">
-                      For now, use "Manual Input" button to test
-                    </p>
-                  </div>
-                </div>
+            {/* Scanner container - always in DOM, visibility controlled by CSS */}
+            <div className={scanning && !loading ? "space-y-4" : "hidden"}>
+              <div 
+                id={scannerContainerId} 
+                className="rounded-lg overflow-hidden mx-auto"
+                style={{ maxWidth: "400px" }}
+              />
+              <div className="text-center">
+                <p className="text-sm text-neutral/70 mb-4">
+                  Position QR code within the frame
+                </p>
+                <button className="btn btn-ghost" onClick={stopCamera}>
+                  Stop Camera
+                </button>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
