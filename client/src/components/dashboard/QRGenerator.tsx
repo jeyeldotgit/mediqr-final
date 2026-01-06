@@ -3,6 +3,7 @@
  * Uses hook for all logic - component is pure presentation
  */
 
+import { QRCodeSVG } from "qrcode.react";
 import { QrCode, RefreshCw, Copy, Check, AlertTriangle } from "lucide-react";
 import { useQRGenerator } from "../../hooks";
 import { EducationModal, useEducationModal } from "../shared/EducationModal";
@@ -53,18 +54,15 @@ export const QRGenerator = () => {
 
         {qrData && !loading && (
           <div className="space-y-4">
-            <div className="flex justify-center p-4 bg-base-100 rounded-lg">
-              <div className="w-64 h-64 flex items-center justify-center border-2 border-secondary/20 rounded-lg">
-                <div className="text-center">
-                  <QrCode className="w-32 h-32 text-secondary/50 mx-auto mb-2" />
-                  <p className="text-xs text-neutral/70">
-                    QR Code Library Required
-                  </p>
-                  <p className="text-xs text-neutral/70 mt-1">
-                    Install: npm install qrcode.react
-                  </p>
-                </div>
-              </div>
+            <div className="flex justify-center p-4 bg-white rounded-lg">
+              <QRCodeSVG
+                value={qrData}
+                size={256}
+                level="M"
+                includeMargin
+                bgColor="#ffffff"
+                fgColor="#000000"
+              />
             </div>
 
             <div className="collapse collapse-arrow bg-base-100">
@@ -134,4 +132,3 @@ export const QRGenerator = () => {
 };
 
 export default QRGenerator;
-
