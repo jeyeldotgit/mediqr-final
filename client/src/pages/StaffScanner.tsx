@@ -14,7 +14,9 @@ const StaffScanner = () => {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [scanStatus, setScanStatus] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const processingRef = useRef(false); // Prevent double-processing
   const scannerContainerId = "qr-scanner-container";
 
   const staffToken = localStorage.getItem("mediqr_staff_token");
@@ -31,6 +33,7 @@ const StaffScanner = () => {
       scannerRef.current = null;
     }
     setScanning(false);
+    processingRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -47,6 +50,8 @@ const StaffScanner = () => {
   const startCamera = async () => {
     try {
       setError(null);
+      setScanStatus(null);
+      processingRef.current = false;
       // Show container first so it's in the DOM with dimensions
       setScanning(true);
       
@@ -64,6 +69,13 @@ const StaffScanner = () => {
           qrbox: { width: 250, height: 250 },
         },
         (decodedText) => {
+          // Prevent double-processing
+          if (processingRef.current) return;
+          processingRef.current = true;
+          
+          console.log("QR Code detected:", decodedText);
+          setScanStatus("QR Code detected! Processing...");
+          
           // Success callback - QR code scanned
           handleQRScan(decodedText);
           stopCamera();
@@ -84,21 +96,36 @@ const StaffScanner = () => {
   };
 
   const handleQRScan = async (qrData: string) => {
+    console.log("Processing QR data:", qrData);
+    setScanStatus("Processing QR code...");
+    
     try {
-      const payload = JSON.parse(qrData);
+      // Try to parse the QR data as JSON
+      let payload;
+      try {
+        payload = JSON.parse(qrData);
+      } catch {
+        throw new Error(`Invalid QR format - not valid JSON. Scanned: "${qrData.substring(0, 100)}..."`);
+      }
+      
+      console.log("Parsed payload:", payload);
       const { token, fragment, userId } = payload;
 
       if (!token || !fragment || !userId) {
-        throw new Error("Invalid QR code format");
+        throw new Error(`Missing required fields. Got: token=${!!token}, fragment=${!!fragment}, userId=${!!userId}`);
       }
 
       setLoading(true);
       setError(null);
+      setScanStatus("Contacting server...");
 
+      console.log("Calling recordAccess API...");
       const response = await recordAccess(
         { qrToken: token, patientId: userId },
         staffToken!
       );
+      
+      console.log("API response:", response);
 
       localStorage.setItem(
         "mediqr_patient_data",
@@ -111,9 +138,14 @@ const StaffScanner = () => {
         })
       );
 
+      setScanStatus("Success! Redirecting...");
       navigate(`/staff/patient-view/${userId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to process QR code");
+      console.error("QR scan error:", err);
+      processingRef.current = false;
+      const errorMessage = err instanceof Error ? err.message : "Failed to process QR code";
+      setError(errorMessage);
+      setScanStatus(null);
       setLoading(false);
     }
   };
@@ -166,6 +198,13 @@ const StaffScanner = () => {
           <div className="alert alert-error mb-4">
             <AlertCircle className="w-5 h-5" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {scanStatus && !error && (
+          <div className="alert alert-info mb-4">
+            <span className="loading loading-spinner loading-sm" />
+            <span>{scanStatus}</span>
           </div>
         )}
 
