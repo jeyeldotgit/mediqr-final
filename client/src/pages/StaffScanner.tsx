@@ -47,6 +47,11 @@ const StaffScanner = () => {
   const startCamera = async () => {
     try {
       setError(null);
+      // Show container first so it's in the DOM with dimensions
+      setScanning(true);
+      
+      // Small delay to ensure DOM is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Create scanner instance
       const scanner = new Html5Qrcode(scannerContainerId);
@@ -57,7 +62,6 @@ const StaffScanner = () => {
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
         },
         (decodedText) => {
           // Success callback - QR code scanned
@@ -68,9 +72,8 @@ const StaffScanner = () => {
           // Error callback - ignore scan errors (no QR found in frame)
         }
       );
-
-      setScanning(true);
     } catch (err) {
+      setScanning(false);
       const message = err instanceof Error ? err.message : "Unknown error";
       if (message.includes("Permission")) {
         setError("Camera permission denied. Please allow camera access and try again.");
@@ -205,8 +208,8 @@ const StaffScanner = () => {
             <div className={scanning && !loading ? "space-y-4" : "hidden"}>
               <div 
                 id={scannerContainerId} 
-                className="rounded-lg overflow-hidden mx-auto"
-                style={{ maxWidth: "400px" }}
+                className="rounded-lg overflow-hidden mx-auto bg-black"
+                style={{ width: "100%", maxWidth: "400px", minHeight: "300px" }}
               />
               <div className="text-center">
                 <p className="text-sm text-neutral/70 mb-4">
